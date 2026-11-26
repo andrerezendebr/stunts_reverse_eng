@@ -105,4 +105,4 @@ During this analysis an official Rust toolchain was installed only under `revers
 
 ## Next investigation
 
-Document resource archive directories and track/replay structures, then trace the simulation entry points in the reconstructed image. Port one verified routine at a time and compare its output with the original behavior. Graphics, input, audio, and full physics remain unimplemented.
+The next milestone now documents [track/replay structures and simulation entry points](track-replay-simulation.md), with the first numerical routine ported and checked against executed DOS code. Resource archive directories and full car simulation remain to be investigated. Graphics, input handling, audio, and full physics remain unimplemented.

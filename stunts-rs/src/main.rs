@@ -4,6 +4,22 @@
 use std::{env, error::Error, fs, io::Write, path::Path, process};
 mod compression;
 mod executable;
+mod fixed;
+mod replay;
+mod track;
+
+/// DOS strings may contain stale bytes after NUL and non-ASCII identifiers.
+/// Render the meaningful prefix while escaping any bytes unsafe for a terminal.
+fn dos_text(bytes: &[u8]) -> String {
+    bytes
+        .split(|&byte| byte == 0)
+        .next()
+        .unwrap_or_default()
+        .iter()
+        .flat_map(|&byte| std::ascii::escape_default(byte))
+        .map(char::from)
+        .collect()
+}
 
 /// Read a little-endian DOS header word. The caller must validate the header length.
 fn word(bytes: &[u8], offset: usize) -> u16 {
@@ -74,6 +90,51 @@ fn run() -> Result<(), Box<dyn Error>> {
             }
         }
         Some("inspect") if args.len() == 2 => inspect(Path::new(&args[1]))?,
+        Some("track") if args.len() == 2 => {
+            let bytes = fs::read(&args[1])?;
+            let track = track::Track::parse(&bytes)?;
+            println!("Track: {}x{}, scenery={} ({}), trailing byte=0x{:02X}",
+                track::SIDE, track::SIDE, track.scenery_id(), track.scenery_name(), track.trailing_byte());
+            println!("Element IDs, top to bottom (terrain is aligned from reversed storage rows):");
+            for y in 0..track::SIDE {
+                for x in 0..track::SIDE { print!("{:02X} ", track.element(x,y).unwrap()); }
+                println!();
+            }
+            println!("Top-left terrain ID: 0x{:02X}", track.terrain(0,0).unwrap());
+            println!("Occupied element cells: {}", track::CELLS - track.element_counts()[0]);
+        }
+        Some("replay") if args.len() == 2 => {
+            let bytes = fs::read(&args[1])?;
+            let replay = replay::Replay::parse(&bytes)?;
+            println!("Track: {}, scenery: {}", dos_text(replay.track_name), replay.track.scenery_name());
+            println!("Player car: {}, material={}, transmission={}", dos_text(replay.player_car), replay.player_material, replay.player_transmission);
+            println!("Opponent: type={}, car={}, material={}, transmission={}", replay.opponent_type, dos_text(replay.opponent_car), replay.opponent_material, replay.opponent_transmission);
+            println!("Frames: {}, FPS: {}, duration: {:.3} seconds", replay.inputs.len(), replay.fps, replay.duration_seconds());
+            let mut counts = [0usize; 256];
+            for &input in replay.inputs { counts[input as usize] += 1; }
+            println!("Raw command frequencies:");
+            for (raw, &count) in counts.iter().enumerate().filter(|(_, n)| **n != 0) {
+                println!("  0x{raw:02X}: {count} frames");
+            }
+        }
+        Some("replay-inputs") if args.len() == 3 => {
+            let bytes = fs::read(&args[1])?;
+            let replay = replay::Replay::parse(&bytes)?;
+            let mut output = std::io::BufWriter::new(fs::OpenOptions::new()
+                .write(true).create_new(true).open(&args[2])?);
+            writeln!(output, "frame,time_seconds,raw,throttle_code,steering_code,shift_up,shift_down,unknown_bits")?;
+            for (frame, &raw) in replay.inputs.iter().enumerate() {
+                let control = replay::Controls::from(raw);
+                writeln!(output, "{frame},{:.6},{raw},{},{},{},{},{}", frame as f64 / f64::from(replay.fps), control.throttle_code, control.steering_code, u8::from(control.shift_up), u8::from(control.shift_down), control.unknown_bits)?;
+            }
+            output.flush()?;
+            println!("Exported {} recorded input bytes; timestamps are frame indices divided by FPS", replay.inputs.len());
+        }
+        Some("fixed-mul") if args.len() == 3 => {
+            let a: i16 = args[1].to_str().ok_or("Invalid integer")?.parse()?;
+            let b: i16 = args[2].to_str().ok_or("Invalid integer")?.parse()?;
+            println!("{}", fixed::multiply_and_scale(a,b));
+        }
         Some("decompress") if args.len() == 3 => {
             let input = fs::read(&args[1])?;
             let output = compression::decompress(&input)?;
@@ -90,7 +151,7 @@ fn run() -> Result<(), Box<dyn Error>> {
                 .write_all(&output)?;
             println!("Combined {mode} packed executable: {} bytes (EXEPACK unpacking still required)", output.len());
         }
-        _ => return Err("Usage: stunts-rs inventory <directory> | inspect <file> | decompress <input> <new-output> | combine <game-directory> <video-mode> <new-output>".into()),
+        _ => return Err("Usage: stunts-rs inventory <directory> | inspect <file> | track <trk> | replay <rpl> | replay-inputs <rpl> <new-csv> | fixed-mul <i16> <i16> | decompress <input> <new-output> | combine <game-directory> <video-mode> <new-output>".into()),
     }
     Ok(())
 }

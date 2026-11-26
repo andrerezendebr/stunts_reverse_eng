@@ -6,6 +6,8 @@ The project cannot run the game yet. The Rust tools list files, inspect DOS MZ h
 
 The first reverse engineering milestone decoded all 79 compressed resources and reconstructed the MCGA executable for analysis in Ghidra. See [the findings and reproduction steps](docs/reverse-engineering.md).
 
+The next milestone adds readers for the 41 original tracks and the default replay, maps key simulation functions in Ghidra, and ports the first fixed-point arithmetic routine with checks against executed DOS instructions. See [tracks, replays, and simulation](docs/track-replay-simulation.md).
+
 ## Running
 
 Install the Rust toolchain. The original game files are in the `stunts_dos/` folder at the repository root.
@@ -15,6 +17,8 @@ cd stunts-rs
 cargo run -- inventory ..\stunts_dos
 cargo run -- inspect ..\stunts_dos\LOAD.EXE
 cargo run -- inspect ..\stunts_dos\MCGA.HDR
+cargo run -- track ..\stunts_dos\HELL5.TRK
+cargo run -- replay ..\stunts_dos\DEFAULT.RPL
 cargo test
 ```
 
@@ -24,7 +28,7 @@ cargo test
 - `stunts_dos/`: original game files, included in Git for analysis.
 - `reverse/`: local Ghidra project and analysis records, excluded from Git.
 - `docs/`: reverse engineering findings and exported text inventories.
-- `tools/ghidra/`: scripts for verified startup names and analysis exports.
+- `tools/ghidra/`: scripts for verified function names, simulation calls, and analysis exports.
 
 ## Planned steps
 

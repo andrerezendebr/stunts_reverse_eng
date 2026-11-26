@@ -1,6 +1,7 @@
 Stunts reimplementation in Rust — getting started
 
 This project provides resource decompression and executable reconstruction tools.
+It also reads tracks and replays and includes the first verified fixed-point routine.
 It cannot run the game yet.
 It does not modify the original files and has no external dependencies.
 
@@ -8,10 +9,14 @@ From the stunts-rs folder:
   cargo run -- inventory ..\stunts_dos
   cargo run -- inspect ..\stunts_dos\LOAD.EXE
   cargo run -- inspect ..\stunts_dos\MCGA.HDR
+  cargo run -- track ..\stunts_dos\HELL5.TRK
+  cargo run -- replay ..\stunts_dos\DEFAULT.RPL
   cargo test
 
 See ../docs/reverse-engineering.md for the completed initial investigation,
 the decompress/combine commands, validation results, and Ghidra instructions.
+See ../docs/track-replay-simulation.md for track/replay layouts, simulation entry
+points, and validation of the first numerical port against original DOS code.
 
 Roadmap:
 1. Identify the version and reconstruct the decompressed game image.
