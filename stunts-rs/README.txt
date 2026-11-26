@@ -1,12 +1,17 @@
 Stunts reimplementation in Rust — getting started
 
-This project starts with analysis tools. It cannot run the game yet.
+This project provides resource decompression and executable reconstruction tools.
+It cannot run the game yet.
 It does not modify the original files and has no external dependencies.
 
 From the stunts-rs folder:
   cargo run -- inventory ..\stunts_dos
   cargo run -- inspect ..\stunts_dos\LOAD.EXE
   cargo run -- inspect ..\stunts_dos\MCGA.HDR
+  cargo test
+
+See ../docs/reverse-engineering.md for the completed initial investigation,
+the decompress/combine commands, validation results, and Ghidra instructions.
 
 Roadmap:
 1. Identify the version and reconstruct the decompressed game image.

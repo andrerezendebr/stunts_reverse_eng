@@ -1,4 +1,6 @@
-use std::{env, error::Error, fs, path::Path, process};
+use std::{env, error::Error, fs, io::Write, path::Path, process};
+mod compression;
+mod executable;
 
 fn word(bytes: &[u8], offset: usize) -> u16 {
     u16::from_le_bytes([bytes[offset], bytes[offset + 1]])
@@ -11,19 +13,34 @@ fn inspect(path: &Path) -> Result<(), Box<dyn Error>> {
         let header = usize::from(word(&bytes, 8)) * 16;
         let pages = usize::from(word(&bytes, 4));
         let last = usize::from(word(&bytes, 2));
-        let declared = if last == 0 { pages * 512 } else {
+        let declared = if last == 0 {
+            pages * 512
+        } else {
             pages.saturating_sub(1) * 512 + last
         };
         println!("  DOS MZ: header={header}, declared size={declared}");
-        println!("  Entry CS:IP={:04X}:{:04X}, stack SS:SP={:04X}:{:04X}",
-            word(&bytes, 22), word(&bytes, 20), word(&bytes, 14), word(&bytes, 16));
-        println!("  Relocations={}, table=0x{:04X}", word(&bytes, 6), word(&bytes, 24));
+        println!(
+            "  Entry CS:IP={:04X}:{:04X}, stack SS:SP={:04X}:{:04X}",
+            word(&bytes, 22),
+            word(&bytes, 20),
+            word(&bytes, 14),
+            word(&bytes, 16)
+        );
+        println!(
+            "  Relocations={}, table=0x{:04X}",
+            word(&bytes, 6),
+            word(&bytes, 24)
+        );
         if header > bytes.len() || declared > bytes.len() {
             println!("  Incomplete file or separate header: do not treat as a standalone EXE.");
         }
     }
     println!("  ASCII strings (minimum 8 bytes):");
-    for string in bytes.split(|b| !(0x20..=0x7e).contains(b)).filter(|s| s.len() >= 8).take(30) {
+    for string in bytes
+        .split(|b| !(0x20..=0x7e).contains(b))
+        .filter(|s| s.len() >= 8)
+        .take(30)
+    {
         println!("    {}", String::from_utf8_lossy(string));
     }
     Ok(())
@@ -43,7 +60,21 @@ fn run() -> Result<(), Box<dyn Error>> {
             }
         }
         Some("inspect") if args.len() == 2 => inspect(Path::new(&args[1]))?,
-        _ => return Err("Usage: stunts-rs inventory <directory> | inspect <file>".into()),
+        Some("decompress") if args.len() == 3 => {
+            let input = fs::read(&args[1])?;
+            let output = compression::decompress(&input)?;
+            fs::OpenOptions::new().write(true).create_new(true).open(&args[2])?
+                .write_all(&output)?;
+            println!("Decompressed {} -> {} bytes", input.len(), output.len());
+        }
+        Some("combine") if args.len() == 4 => {
+            let mode = args[2].to_str().ok_or("Invalid video mode")?.to_ascii_uppercase();
+            let output = executable::combine(Path::new(&args[1]), &mode)?;
+            fs::OpenOptions::new().write(true).create_new(true).open(&args[3])?
+                .write_all(&output)?;
+            println!("Combined {mode} packed executable: {} bytes (EXEPACK unpacking still required)", output.len());
+        }
+        _ => return Err("Usage: stunts-rs inventory <directory> | inspect <file> | decompress <input> <new-output> | combine <game-directory> <video-mode> <new-output>".into()),
     }
     Ok(())
 }

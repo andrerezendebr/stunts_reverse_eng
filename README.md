@@ -2,7 +2,9 @@
 
 An early-stage reimplementation of Stunts for DOS in Rust, using Ghidra to study the original routines.
 
-The project cannot run the game yet. The current tool lists files and inspects DOS MZ headers and ASCII strings.
+The project cannot run the game yet. The Rust tools list files, inspect DOS MZ headers, decode the game's compressed resources, and reconstruct packed executables for four video modes.
+
+The first reverse engineering milestone decoded all 79 compressed resources and reconstructed the MCGA executable for analysis in Ghidra. See [the findings and reproduction steps](docs/reverse-engineering.md).
 
 ## Running
 
@@ -13,6 +15,7 @@ cd stunts-rs
 cargo run -- inventory ..\stunts_dos
 cargo run -- inspect ..\stunts_dos\LOAD.EXE
 cargo run -- inspect ..\stunts_dos\MCGA.HDR
+cargo test
 ```
 
 ## Layout
@@ -20,6 +23,8 @@ cargo run -- inspect ..\stunts_dos\MCGA.HDR
 - `stunts-rs/`: Rust source for the analysis tools and future reimplementation.
 - `stunts_dos/`: original game files, included in Git for analysis.
 - `reverse/`: local Ghidra project and analysis records, excluded from Git.
+- `docs/`: reverse engineering findings and exported text inventories.
+- `tools/ghidra/`: scripts for verified startup names and analysis exports.
 
 ## Planned steps
 
