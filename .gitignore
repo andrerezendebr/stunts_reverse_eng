@@ -1,5 +1,4 @@
-# Arquivos originais e bancos locais de engenharia reversa
-/stunts_dos/
+# Bancos locais de engenharia reversa
 /reverse/
 
 # Build Rust e configurações locais

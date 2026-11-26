@@ -6,7 +6,7 @@ O projeto ainda não executa o jogo. A ferramenta atual lista arquivos e inspeci
 
 ## Executar
 
-Instale o toolchain Rust e coloque sua própria cópia do jogo na pasta `stunts_dos/`, na raiz do repositório.
+Instale o toolchain Rust. Os arquivos originais do jogo estão na pasta `stunts_dos/`, na raiz do repositório.
 
 ```powershell
 cd stunts-rs
@@ -18,7 +18,7 @@ cargo run -- inspect ..\stunts_dos\MCGA.HDR
 ## Organização
 
 - `stunts-rs/`: código Rust das ferramentas de análise e da futura reimplementação.
-- `stunts_dos/`: cópia local do jogo, excluída do Git.
+- `stunts_dos/`: arquivos originais do jogo, incluídos no Git para análise.
 - `reverse/`: projeto Ghidra e registros locais, excluídos do Git.
 
 ## Etapas previstas
@@ -34,4 +34,4 @@ cargo run -- inspect ..\stunts_dos\MCGA.HDR
 - [ReStunts](https://github.com/4d-stunts/restunts)
 - [ReStunts2](https://github.com/dstien/restunts2)
 
-Os executáveis e recursos originais do jogo não são distribuídos neste repositório.
+Os executáveis e recursos em `stunts_dos/` pertencem aos respectivos titulares. Sua inclusão não altera a titularidade desses arquivos.
