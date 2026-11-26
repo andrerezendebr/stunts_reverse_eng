@@ -1,4 +1,5 @@
 //! Native software-rendered driving experiment, separate from verified DOS physics.
+#![cfg_attr(all(target_os = "windows", not(test)), windows_subsystem = "windows")]
 use minifb::{Key, KeyRepeat, MouseButton, MouseMode, Window, WindowOptions};
 #[path = "stunts-play/menu.rs"]
 mod menu;
@@ -320,7 +321,39 @@ fn physics_steps(
     steps
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() {
+    if let Err(error) = run() {
+        show_error(&format!("Unable to run Stunts Rust.\n\n{error}"));
+        std::process::exit(1);
+    }
+}
+
+/// GUI applications have no console for startup failures. Keep errors visible
+/// through the Windows dialog instead of silently closing the application.
+#[cfg(target_os = "windows")]
+fn show_error(message: &str) {
+    #[link(name = "user32")]
+    extern "system" {
+        fn MessageBoxW(
+            window: *mut std::ffi::c_void,
+            text: *const u16,
+            title: *const u16,
+            flags: u32,
+        ) -> i32;
+    }
+    let text: Vec<u16> = message.encode_utf16().chain(Some(0)).collect();
+    let title: Vec<u16> = "Stunts Rust".encode_utf16().chain(Some(0)).collect();
+    // Both UTF-16 buffers are terminated and remain alive for the modal call.
+    unsafe {
+        MessageBoxW(std::ptr::null_mut(), text.as_ptr(), title.as_ptr(), 0x10);
+    }
+}
+#[cfg(not(target_os = "windows"))]
+fn show_error(message: &str) {
+    eprintln!("{message}");
+}
+
+fn run() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<_> = std::env::args().skip(1).collect();
     let value = |key: &str| {
         args.iter()

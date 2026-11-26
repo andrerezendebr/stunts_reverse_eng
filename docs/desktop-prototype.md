@@ -4,6 +4,10 @@ The `desktop` feature builds `stunts-play`, a native Windows application using
 minifb 0.29 and a CPU framebuffer. It runs Rust directly; DOSBox, Ghidra, Python
 and the reconstructed DOS executable are not required at runtime.
 
+On Windows the executable uses the GUI subsystem: launching its desktop shortcut
+opens the game without a console window. Startup/runtime errors appear in a
+Windows message dialog. The separate `stunts-rs` analysis CLI retains its console.
+
 ## Play
 
 Run `./play.ps1` from PowerShell, or build with:
