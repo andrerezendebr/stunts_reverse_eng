@@ -1,5 +1,8 @@
 //! Native software-rendered driving experiment, separate from verified DOS physics.
 use minifb::{Key, KeyRepeat, Window, WindowOptions};
+#[path = "stunts-play/menu.rs"]
+mod menu;
+use menu::{Action, Catalog, Command, Menu, Screen};
 use std::{
     path::PathBuf,
     time::{Duration, Instant},
@@ -7,7 +10,7 @@ use std::{
 use stunts_rs::{
     car::Car,
     compression, drivetrain,
-    prototype::{World, STEP, TILE},
+    prototype::{World, TILE},
     resource::Archive,
     scene::Scene,
     shape::Shape,
@@ -220,6 +223,102 @@ impl Renderer {
     }
 }
 
+/// Own the selected resources so changing a menu selection cannot mutate the
+/// active race. Build the replacement fully before swapping it into the game.
+struct Race {
+    world: World,
+    scene: Scene,
+    track_bytes: Vec<u8>,
+    car_bytes: Vec<u8>,
+    shape: Shape,
+}
+impl Race {
+    fn load(root: &std::path::Path, catalog: &Catalog, menu: &Menu) -> Result<Self, String> {
+        let track_bytes = catalog.tracks[menu.track].bytes.clone();
+        let track = Track::parse(&track_bytes)?;
+        let choice = &catalog.cars[menu.car];
+        let car_bytes = std::fs::read(root.join(&choice.file)).map_err(|e| e.to_string())?;
+        let car = Car::parse(&car_bytes)?;
+        let model =
+            compression::decompress(&std::fs::read(&choice.model).map_err(|e| e.to_string())?)?;
+        let archive = Archive::parse(&model)?;
+        let shape = Shape::parse(archive.get(b"car0").ok_or("Missing car0 mesh")?)?;
+        let mut world = World::new(&car, &track)?;
+        let scene = Scene::load(root, &track)?;
+        world.place_on_scene(&scene);
+        Ok(Self {
+            world,
+            scene,
+            track_bytes,
+            car_bytes,
+            shape,
+        })
+    }
+    fn tick(&mut self, input: u8) -> Result<(), String> {
+        self.world.tick_scene(
+            &Car::parse(&self.car_bytes)?,
+            &Track::parse(&self.track_bytes)?,
+            &self.scene,
+            input,
+        )
+    }
+    fn reset(&mut self) -> Result<(), String> {
+        self.world.reset(&Car::parse(&self.car_bytes)?)
+    }
+    fn draw(&self, renderer: &mut Renderer) {
+        renderer.render(
+            &self.world,
+            &Track::parse(&self.track_bytes).unwrap(),
+            &self.shape,
+            &self.scene,
+        );
+        menu::text(
+            &mut renderer.pixels,
+            W,
+            155,
+            18,
+            &format!(
+                "SPEED {:3}  RPM {:5}  GEAR {}",
+                self.world.state.word(drivetrain::SPEED2) / 256,
+                self.world.state.word(0x22),
+                self.world.state.0[0xbe]
+            ),
+            2,
+            0xffffff,
+        );
+        menu::text(
+            &mut renderer.pixels,
+            W,
+            20,
+            H - 48,
+            "ESC PAUSE",
+            2,
+            0xffffff,
+        );
+    }
+}
+
+/// Menus discard elapsed simulation time. Resuming must never replay the time
+/// spent paused as a burst of physics steps or change the car's position.
+fn physics_steps(
+    accumulator: &mut Duration,
+    elapsed: Duration,
+    previous: Screen,
+    current: Screen,
+) -> usize {
+    if previous != Screen::Racing || current != Screen::Racing {
+        *accumulator = Duration::ZERO;
+        return 0;
+    }
+    *accumulator += elapsed.min(Duration::from_millis(250));
+    let mut steps = 0;
+    while *accumulator >= Duration::from_millis(50) {
+        *accumulator -= Duration::from_millis(50);
+        steps += 1;
+    }
+    steps
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<_> = std::env::args().skip(1).collect();
     let value = |key: &str| {
@@ -228,34 +327,50 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .and_then(|i| args.get(i + 1))
     };
     if args.iter().any(|a| a == "--help") {
-        println!("stunts-play [--data PATH] [--track NAME.TRK] [--frames N] [--headless] [--screenshot FILE.ppm]\nArrows/WASD: drive and brake; R: reset; Escape: exit.\nOriginal track/car meshes; experimental triangle contacts and world physics.");
+        println!("stunts-play [--data PATH] [--track NAME.TRK] [--car CARXXXX.RES] [--quick-start] [--frames N] [--headless] [--menu-preview] [--screenshot FILE.ppm]\nMenu: arrows select/change, Enter confirm, Escape back.\nDriving: arrows/WASD, R reset, Escape pause.\nHeadless mode starts a race unless --menu-preview is supplied.");
         return Ok(());
     }
     let root = value("--data")
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../stunts_dos"));
-    let track_bytes =
-        std::fs::read(root.join(value("--track").map(String::as_str).unwrap_or("HELL5.TRK")))?;
-    let track = Track::parse(&track_bytes)?;
-    let car_bytes = std::fs::read(root.join("CARPMIN.RES"))?;
-    let car = Car::parse(&car_bytes)?;
-    let model_bytes = compression::decompress(&std::fs::read(root.join("STPMIN.P3S"))?)?;
-    let archive = Archive::parse(&model_bytes)?;
-    let shape = Shape::parse(archive.get(b"car0").ok_or("Missing car0 mesh")?)?;
-    let mut world = World::new(&car, &track)?;
-    let scene = Scene::load(&root, &track)?;
-    world.place_on_scene(&scene);
+    let catalog = Catalog::load(&root)?;
+    let track_name = value("--track").map(String::as_str).unwrap_or("HELL5.TRK");
+    let car_name = value("--car").map(String::as_str).unwrap_or("CARPMIN.RES");
+    let track_index = catalog
+        .tracks
+        .iter()
+        .position(|t| t.name.eq_ignore_ascii_case(track_name))
+        .ok_or_else(|| format!("Unknown track {track_name}"))?;
+    let car_index = catalog
+        .cars
+        .iter()
+        .position(|c| c.file.eq_ignore_ascii_case(car_name))
+        .ok_or_else(|| format!("Unknown car {car_name}"))?;
+    let mut menu = Menu::new(
+        catalog.tracks.len(),
+        catalog.cars.len(),
+        track_index,
+        car_index,
+    );
     let mut renderer = Renderer::new();
     let limit = value("--frames").map(|n| n.parse::<usize>()).transpose()?;
     let headless = args.iter().any(|a| a == "--headless");
     if headless && limit.is_none() {
         return Err("--headless requires --frames N".into());
     }
+    let skip_menu = (headless || args.iter().any(|a| a == "--quick-start"))
+        && !args.iter().any(|a| a == "--menu-preview");
+    let mut race = if skip_menu {
+        menu.screen = Screen::Racing;
+        Some(Race::load(&root, &catalog, &menu)?)
+    } else {
+        None
+    };
     let mut window = if headless {
         None
     } else {
         Some(Window::new(
-            "Stunts Rust experimental driving | WASD/arrows, R reset, Esc exit",
+            "Stunts Rust | Main menu",
             W,
             H,
             WindowOptions {
@@ -275,40 +390,106 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             break;
         }
         let mut input = if headless { 1 } else { 0 };
+        let old_screen = menu.screen;
+        let mut command = Command::None;
         if let Some(w) = window.as_mut() {
-            if !w.is_open() || w.is_key_down(Key::Escape) {
+            if !w.is_open() {
                 break;
             }
-            if w.is_key_down(Key::Up) || w.is_key_down(Key::W) {
-                input |= 1;
+            if menu.screen == Screen::Racing {
+                if w.is_key_pressed(Key::Escape, KeyRepeat::No) {
+                    menu.pause();
+                }
+                if w.is_key_down(Key::Up) || w.is_key_down(Key::W) {
+                    input |= 1;
+                }
+                if w.is_key_down(Key::Down) || w.is_key_down(Key::S) {
+                    input |= 2;
+                }
+                if w.is_key_down(Key::Left) || w.is_key_down(Key::A) {
+                    input |= 8;
+                }
+                if w.is_key_down(Key::Right) || w.is_key_down(Key::D) {
+                    input |= 4;
+                }
+                if w.is_key_pressed(Key::R, KeyRepeat::No) {
+                    if let Some(race) = race.as_mut() {
+                        race.reset()?;
+                    }
+                }
+            } else {
+                for (key, action) in [
+                    (Key::Up, Action::Up),
+                    (Key::Down, Action::Down),
+                    (Key::Left, Action::Left),
+                    (Key::Right, Action::Right),
+                    (Key::Enter, Action::Confirm),
+                    (Key::Escape, Action::Back),
+                ] {
+                    if w.is_key_pressed(
+                        key,
+                        if matches!(action, Action::Confirm | Action::Back) {
+                            KeyRepeat::No
+                        } else {
+                            KeyRepeat::Yes
+                        },
+                    ) {
+                        command = menu.act(action);
+                        if command != Command::None {
+                            break;
+                        }
+                    }
+                }
             }
-            if w.is_key_down(Key::Down) || w.is_key_down(Key::S) {
-                input |= 2;
+        }
+        match command {
+            Command::Quit => break,
+            Command::Start => match Race::load(&root, &catalog, &menu) {
+                Ok(next) => {
+                    race = Some(next);
+                    menu.screen = Screen::Racing;
+                    menu.error = None;
+                }
+                Err(error) => menu.error = Some(error),
+            },
+            Command::Resume => {
+                if race.is_some() {
+                    menu.screen = Screen::Racing;
+                }
             }
-            if w.is_key_down(Key::Left) || w.is_key_down(Key::A) {
-                input |= 8;
+            Command::Restart => {
+                if let Some(race) = race.as_mut() {
+                    match race.reset() {
+                        Ok(()) => menu.screen = Screen::Racing,
+                        Err(error) => menu.error = Some(error),
+                    }
+                }
             }
-            if w.is_key_down(Key::Right) || w.is_key_down(Key::D) {
-                input |= 4;
-            }
-            if w.is_key_pressed(Key::R, KeyRepeat::No) {
-                world.reset(&car)?;
-            }
+            Command::None => {}
         }
         let now = Instant::now();
-        accumulator += (now - previous).min(Duration::from_millis(250));
+        let steps = physics_steps(&mut accumulator, now - previous, old_screen, menu.screen);
         previous = now;
-        if headless {
-            world.tick_scene(&car, &track, &scene, input)?;
-        } else {
-            while accumulator >= Duration::from_secs_f32(STEP) {
-                world.tick_scene(&car, &track, &scene, input)?;
-                accumulator -= Duration::from_secs_f32(STEP);
+        if menu.screen == Screen::Racing {
+            let race = race.as_mut().ok_or("No active race")?;
+            if headless {
+                race.tick(input)?;
+            } else {
+                for _ in 0..steps {
+                    race.tick(input)?;
+                }
             }
+            race.draw(&mut renderer);
+        } else {
+            menu.draw(&mut renderer.pixels, W, H, &catalog);
         }
-        renderer.render(&world, &track, &shape, &scene);
         if let Some(w) = window.as_mut() {
-            w.set_title(&format!("Stunts Rust EXPERIMENTAL | speed {:.1} raw/256 | RPM {} | gear {} | contacts {} | hits {} | WASD / R / Esc",world.state.word(drivetrain::SPEED2)as f32/256.0,world.state.word(0x22),world.state.0[0xbe],world.contacts,world.collisions));
+            w.set_title(match menu.screen {
+                Screen::Main => "Stunts Rust | Main menu",
+                Screen::Pause => "Stunts Rust | Paused",
+                Screen::Controls => "Stunts Rust | Controls",
+                Screen::Racing => "Stunts Rust | Racing - Esc: pause",
+            });
             w.update_with_buffer(&renderer.pixels, W, H)?;
         }
         frames += 1;
@@ -316,16 +497,71 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(path) = value("--screenshot") {
         renderer.save(path)?;
     }
-    println!(
-        "Rendered {frames} frames; position {:?}; contacts {}; collisions {}",
-        world.position, world.contacts, world.collisions
-    );
+    if let Some(race) = race {
+        let world = race.world;
+        println!(
+            "Rendered {frames} frames; position {:?}; contacts {}; collisions {}",
+            world.position, world.contacts, world.collisions
+        );
+    } else {
+        println!("Rendered {frames} menu frames");
+    }
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn pause_discards_time_and_resume_does_not_catch_up() {
+        let mut accumulator = Duration::from_millis(40);
+        assert_eq!(
+            physics_steps(
+                &mut accumulator,
+                Duration::from_secs(10),
+                Screen::Racing,
+                Screen::Pause
+            ),
+            0
+        );
+        assert_eq!(accumulator, Duration::ZERO);
+        assert_eq!(
+            physics_steps(
+                &mut accumulator,
+                Duration::from_secs(10),
+                Screen::Pause,
+                Screen::Pause
+            ),
+            0
+        );
+        assert_eq!(
+            physics_steps(
+                &mut accumulator,
+                Duration::from_secs(10),
+                Screen::Pause,
+                Screen::Racing
+            ),
+            0
+        );
+        assert_eq!(
+            physics_steps(
+                &mut accumulator,
+                Duration::from_millis(20),
+                Screen::Racing,
+                Screen::Racing
+            ),
+            0
+        );
+        assert_eq!(
+            physics_steps(
+                &mut accumulator,
+                Duration::from_millis(30),
+                Screen::Racing,
+                Screen::Racing
+            ),
+            1
+        );
+    }
     #[test]
     fn near_plane_clips_crossing_triangles_and_rejects_geometry_behind_camera() {
         let mut renderer = Renderer::new();

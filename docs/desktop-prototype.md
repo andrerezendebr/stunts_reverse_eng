@@ -13,11 +13,33 @@ cargo build --release --manifest-path stunts-rs/Cargo.toml --features desktop --
 .\stunts-rs\target\release\stunts-play.exe --data stunts_dos --track HELL5.TRK
 ```
 
+The main menu opens first. Up/Down selects an option, Left/Right changes the
+selected track/car, and Enter confirms. All 41 tracks and 11 cars are discovered
+from the original resources. The menu shows the selected track's layout and car
+name. Start Race loads the selected car's parameters and `car0` mesh, and the
+selected track's scene. A failed race load leaves the menu open with an error.
+
 W/Up accelerates, S/Down brakes, A/Left and D/Right steer, R resets the car, and
-Escape exits. Automatic shifting uses the verified drivetrain. Telemetry appears
-in the window title; the display includes a minimap, chase camera and speed bar.
+Escape opens the pause menu. Resume preserves the race; Restart resets it;
+Main Menu permits another selection; Exit closes the application. Physics and
+its accumulated time stop in menus, avoiding a catch-up jump on resume.
+Automatic shifting uses the verified drivetrain. Telemetry appears on screen;
+the display includes a minimap, rear chase camera and speed bar.
 The optional launcher uses the existing ignored local toolchain if Cargo is not
 on PATH. Original game files are opened for reading only.
+
+`--track NAME.TRK` and `--car CARXXXX.RES` set the initially selected entries.
+`--quick-start` starts them immediately. Headless mode also starts a race by
+default, preserving the existing smoke-test workflow. Add `--menu-preview` to
+render the menu without a window, for example:
+
+```powershell
+stunts-rs/target/release/stunts-play.exe --headless --menu-preview --frames 1 --screenshot reverse/menu.ppm
+```
+
+`src/bin/stunts-play/menu.rs` implements this new Rust interface and its built-in
+bitmap font. It does not claim to reproduce the original DOS menu routines or
+screens. Navigation and pause timing are tested separately from driving physics.
 
 ## Implemented behavior and limits
 

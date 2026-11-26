@@ -12,7 +12,8 @@ A partial native port of the original DOS game, using Ghidra for analysis and or
 - Optional desktop prototype: keyboard driving, original track/terrain/scenery meshes and Indy polygons, chase camera, minimap, experimental suspension against scene triangles and swept wall collisions.
 - Original slope-road substitution validated against all 65,536 byte input pairs; scene metadata extracted directly from the unchanged executable.
 - Native control traces checked against 6600 sequential frames of original DOS function execution.
-- **47 tests with the desktop feature**: 45 library tests plus two rendering tests, including original-code vectors, uphill suspension, wall/bridge contacts, scene parsing, near-plane clipping and failure rollback.
+- Native main/pause menus with all 41 tracks and 11 cars, track preview, controls and race restart. Opening a menu freezes simulation time.
+- **50 tests with the desktop feature**: 45 library tests plus five desktop tests, including original-code vectors, menu navigation, pause/resume timing, uphill suspension, wall/bridge contacts and rendering.
 
 ## Run
 
@@ -24,7 +25,7 @@ To build and play the experimental Windows prototype from the repository root:
 cargo run --release --manifest-path stunts-rs/Cargo.toml --features desktop --bin stunts-play -- --data stunts_dos
 ```
 
-Controls: **W/Up** accelerate, **S/Down** brake, **A/Left** and **D/Right** steer, **R** reset, **Escape** exit. The Windows executable is `stunts-rs/target/release/stunts-play.exe`. Use `--track NAME.TRK` to select another original track. See [prototype status and validation](docs/desktop-prototype.md) for the current limits.
+The game opens at its main menu. Use **Up/Down** to select an option, **Left/Right** to change the track/car and **Enter** to confirm. Driving: **W/Up** accelerate, **S/Down** brake, **A/Left** and **D/Right** steer, **R** reset, **Escape** pause. The pause menu offers resume, restart, main menu and exit. The Windows executable is `stunts-rs/target/release/stunts-play.exe`. `--track NAME.TRK` and `--car CARXXXX.RES` set the initial menu choices; `--quick-start` bypasses the menu. See [prototype status and validation](docs/desktop-prototype.md) for the current limits.
 
 With Rust installed, from the repository root:
 
