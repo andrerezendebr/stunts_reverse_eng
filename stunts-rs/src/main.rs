@@ -2,10 +2,13 @@
 //! Decoding and executable assembly live in separate modules so the CLI only
 //! handles arguments, file access, and human-readable output.
 use std::{env, error::Error, fs, io::Write, path::Path, process};
+mod car;
 mod compression;
 mod executable;
 mod fixed;
 mod replay;
+mod resource;
+mod steering;
 mod track;
 
 /// DOS strings may contain stale bytes after NUL and non-ASCII identifiers.
@@ -90,6 +93,32 @@ fn run() -> Result<(), Box<dyn Error>> {
             }
         }
         Some("inspect") if args.len() == 2 => inspect(Path::new(&args[1]))?,
+        Some("resources") if args.len() == 2 => {
+            let bytes = fs::read(&args[1])?;
+            let archive = resource::Archive::parse(&bytes)?;
+            println!("ID\tpayload_offset\textent_bytes");
+            for entry in archive.entries {
+                println!("{}\t{}\t{}", dos_text(&entry.id), entry.offset, entry.bytes.len());
+            }
+        }
+        Some("car") if args.len() == 2 => {
+            let bytes = fs::read(&args[1])?;
+            let car = car::Car::parse(&bytes)?;
+            println!("Name: {}", dos_text(car.name));
+            println!("Gears: {}, ratios (raw): {:?}", car.gears(), car.gear_ratios());
+            println!("Mass (raw): {}, braking (raw): {}", car.mass(), car.braking());
+            println!("RPM fields (raw): idle={}, downshift={}, upshift={}, maximum={}", car.idle_rpm(), car.downshift_rpm(), car.upshift_rpm(), car.maximum_rpm());
+            println!("Aero resistance (raw): {}, grip (raw): {}, sliding (raw): {}", car.aero_resistance(), car.grip(), car.sliding());
+            println!("Idle torque (raw): {}, torque samples: {}", car.idle_torque(), car.torque_curve().len());
+            println!("Aero lookup (raw signed words): {:?}", car.aero_table());
+        }
+        Some("steer") if args.len() == 5 => {
+            let angle = args[1].to_str().ok_or("Invalid angle")?.parse()?;
+            let speed = args[2].to_str().ok_or("Invalid speed")?.parse()?;
+            let input = args[3].to_str().ok_or("Invalid steering code")?.parse()?;
+            let fps = args[4].to_str().ok_or("Invalid frame rate")?.parse()?;
+            println!("{}", steering::update(angle, speed, input, fps)?);
+        }
         Some("track") if args.len() == 2 => {
             let bytes = fs::read(&args[1])?;
             let track = track::Track::parse(&bytes)?;
@@ -151,7 +180,7 @@ fn run() -> Result<(), Box<dyn Error>> {
                 .write_all(&output)?;
             println!("Combined {mode} packed executable: {} bytes (EXEPACK unpacking still required)", output.len());
         }
-        _ => return Err("Usage: stunts-rs inventory <directory> | inspect <file> | track <trk> | replay <rpl> | replay-inputs <rpl> <new-csv> | fixed-mul <i16> <i16> | decompress <input> <new-output> | combine <game-directory> <video-mode> <new-output>".into()),
+        _ => return Err("Usage: stunts-rs inventory <directory> | inspect <file> | resources <uncompressed-archive> | car <car-res> | steer <angle-i16> <speed-u16> <input-code> <fps> | track <trk> | replay <rpl> | replay-inputs <rpl> <new-csv> | fixed-mul <i16> <i16> | decompress <input> <new-output> | combine <game-directory> <video-mode> <new-output>".into()),
     }
     Ok(())
 }

@@ -122,4 +122,4 @@ The suite currently has 14 passing tests, including the 41 original tracks, the 
 
 ## Remaining work
 
-Next, identify the steering-response tables and car simulation resources, then port and validate another bounded arithmetic or control routine. Full engine, suspension, collisions, opponent behavior, rendering, sound, and frame-by-frame replay state comparison remain unimplemented.
+The next milestone now maps [steering-response tables and car simulation resources](steering-car-parameters.md), with steering and aero-table ports validated against original CPU execution. Full engine, suspension, collisions, opponent behavior, rendering, sound, and frame-by-frame replay state comparison remain unimplemented.

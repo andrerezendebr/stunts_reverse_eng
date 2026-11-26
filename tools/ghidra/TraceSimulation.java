@@ -31,7 +31,10 @@ public class TraceSimulation extends GhidraScript {
             {"1471:3368", "update_car_speed", "558bec83ec0a5756833e6092147507c746fe0600eb05c746fe0c"},
             {"1e1a:2534", "track_setup", "558bec81ecf00a5756b88003995250b8a82f50"},
             {"21b7:000a", "run_game", "558bec83ec1656c746f4ffffc706c4810000c706c6814001c746"},
-            {"2ea2:1624", "multiply_and_scale", "558bec8b4606f76e08d1e0d1d2d1e0d1d2d1e083d2008bc25dcb"}
+            {"2ea2:1624", "multiply_and_scale", "558bec8b4606f76e08d1e0d1d2d1e0d1d2d1e083d2008bc25dcb"},
+            {"1471:40a2", "update_steering", "558bec83ec0657568b3e968ea1a28eb10ad3e824fc8846fc988b"},
+            {"1471:5592", "setup_aero_trackdata", "558bec83ec025756837e0a007403e98300"},
+            {"274b:15dc", "locate_shape_alt", "558becff760aff7608ff7606"}
         };
         // Guard both the file version and each instruction prefix before renaming.
         // Prefixes stop before relocated segment words, which Ghidra adjusts.

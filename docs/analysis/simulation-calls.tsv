@@ -13,7 +13,7 @@ caller_address	caller_name	callee_address	callee_name
 1471:2ad8	player_op	1471:3106	FUN_1471_3106
 1471:2ad8	player_op	1471:3368	update_car_speed
 1471:2ad8	player_op	1471:38c6	FUN_1471_38c6
-1471:2ad8	player_op	1471:40a2	FUN_1471_40a2
+1471:2ad8	player_op	1471:40a2	update_steering
 1471:2ad8	player_op	1471:4650	FUN_1471_4650
 1471:2ad8	player_op	1471:4ed6	FUN_1471_4ed6
 1471:2ad8	player_op	24d6:149a	FUN_24d6_149a
@@ -83,3 +83,8 @@ caller_address	caller_name	callee_address	callee_name
 21b7:000a	run_game	39e1:064c	FUN_39e1_064c
 21b7:000a	run_game	3a95:0008	FUN_3a95_0008
 21b7:000a	run_game	3a95:0050	FUN_3a95_0050
+1471:40a2	update_steering	2cc5:1938	FUN_2cc5_1938
+1471:5592	setup_aero_trackdata	274b:15dc	locate_shape_alt
+1471:5592	setup_aero_trackdata	274b:1626	FUN_274b_1626
+1471:5592	setup_aero_trackdata	2cc5:1c88	FUN_2cc5_1c88
+274b:15dc	locate_shape_alt	2ea2:257d	FUN_2ea2_257d

@@ -1,0 +1,12 @@
+file,name,gears,mass_raw,braking_raw,idle_rpm_raw,downshift_rpm_raw,upshift_rpm_raw,maximum_rpm_raw,aero_raw,grip_raw,sliding_raw
+"CARANSX.RES","Acura NSX","5","31","256","800","4200","8000","8400","27","211","0"
+"CARAUDI.RES","Audi Quattro Sport","5","25","256","800","4000","6700","8400","33","211","0"
+"CARCOUN.RES","Lamborghini Countach","5","33","256","800","5000","7800","8250","25","210","0"
+"CARFGTO.RES","Ferrari GTO","5","27","256","900","4200","7700","8000","20","211","0"
+"CARJAGU.RES","Jaguar XJR9","5","21","400","1800","7000","10200","11000","24","480","0"
+"CARLANC.RES","Lancia Delta Integ.","5","25","256","800","4000","6600","8400","36","211","0"
+"CARLM02.RES","Lamborghini LM-002","5","55","220","750","3800","6800","7000","51","211","0"
+"CARP962.RES","Porsche 962","5","20","400","1800","7000","10200","11000","24","500","0"
+"CARPC04.RES","Porsche Carrera 4","5","32","256","800","4000","6900","7200","27","211","0"
+"CARPMIN.RES","Porsche/March INDY","5","15","512","2000","8400","12000","12200","25","600","0"
+"CARVETT.RES","Corvette ZR1","6","35","256","800","4100","6400","7100","33","211","0"

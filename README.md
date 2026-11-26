@@ -8,6 +8,8 @@ The first reverse engineering milestone decoded all 79 compressed resources and 
 
 The next milestone adds readers for the 41 original tracks and the default replay, maps key simulation functions in Ghidra, and ports the first fixed-point arithmetic routine with checks against executed DOS instructions. See [tracks, replays, and simulation](docs/track-replay-simulation.md).
 
+The latest mapping adds resource directories, parameters for all eleven cars, and a steering-response port checked in 1488 original-code executions. Aero tables are checked against 22 original car-setup executions. See [steering and car parameters](docs/steering-car-parameters.md).
+
 ## Running
 
 Install the Rust toolchain. The original game files are in the `stunts_dos/` folder at the repository root.
@@ -19,6 +21,8 @@ cargo run -- inspect ..\stunts_dos\LOAD.EXE
 cargo run -- inspect ..\stunts_dos\MCGA.HDR
 cargo run -- track ..\stunts_dos\HELL5.TRK
 cargo run -- replay ..\stunts_dos\DEFAULT.RPL
+cargo run -- car ..\stunts_dos\CARPMIN.RES
+cargo run -- steer -100 0 1 20
 cargo test
 ```
 
