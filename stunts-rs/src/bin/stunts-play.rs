@@ -118,9 +118,9 @@ impl Renderer {
         self.depth.fill(f32::INFINITY);
         self.heading = world.heading;
         self.camera = [
-            world.position[0] - world.heading.sin() * 11.0,
-            world.position[1] + 4.5,
-            world.position[2] + world.heading.cos() * 11.0,
+            world.position[0] - world.heading.sin() * 8.0,
+            world.position[1] + 2.8,
+            world.position[2] + world.heading.cos() * 8.0,
         ];
         for index in scene.nearby(world.position[0], world.position[2], 6) {
             let triangle = &scene.triangles[index];
@@ -132,11 +132,13 @@ impl Renderer {
             .vertices
             .iter()
             .map(|v| {
-                let x = v[0] as f32 * 0.0025;
+                // The original car mesh faces +Z; prototype driving faces -Z.
+                // Rotate the model half a turn so the chase camera sees its rear.
+                let x = -v[0] as f32 * 0.0025;
                 let y = v[1] as f32 * 0.0025;
-                let z = v[2] as f32 * 0.0025;
-                let py = y * world.pitch.cos() - z * world.pitch.sin();
-                let pz = y * world.pitch.sin() + z * world.pitch.cos();
+                let z = -v[2] as f32 * 0.0025;
+                let py = y * world.pitch.cos() + z * world.pitch.sin();
+                let pz = -y * world.pitch.sin() + z * world.pitch.cos();
                 let px = x * world.roll.cos() - py * world.roll.sin();
                 let py = x * world.roll.sin() + py * world.roll.cos();
                 [
