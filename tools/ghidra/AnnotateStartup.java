@@ -7,6 +7,8 @@ import ghidra.program.model.listing.CodeUnit;
 public class AnnotateStartup extends GhidraScript {
     @Override
     public void run() throws Exception {
+        // These segment:offset addresses were checked for one reconstructed image.
+        // Refuse other binaries rather than attaching plausible names to wrong code.
         String expected = "2e2b514d183835267bdfd4ebeeb409b1c9facad78751ebaafeac54d93453e51b";
         if (!expected.equalsIgnoreCase(currentProgram.getExecutableSHA256())) {
             throw new IllegalArgumentException("This script only supports the recorded MCGA.exe SHA256");
@@ -20,6 +22,8 @@ public class AnnotateStartup extends GhidraScript {
         var location = toAddr(address);
         var function = getFunctionAt(location);
         if (function == null) throw new IllegalStateException("Missing function at " + address);
+        // Rename an existing analyzed function and record the supporting evidence.
+        // Do not invent a function boundary when automatic analysis found none.
         function.setName(name, SourceType.USER_DEFINED);
         currentProgram.getListing().setComment(location, CodeUnit.PLATE_COMMENT, comment);
     }

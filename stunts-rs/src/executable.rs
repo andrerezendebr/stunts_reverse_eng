@@ -2,10 +2,13 @@
 use crate::compression::decompress;
 use std::{error::Error, fs, path::Path};
 
+/// Read a DOS header word after the caller has checked the 30-byte header.
 fn word(bytes: &[u8], offset: usize) -> usize {
     u16::from_le_bytes([bytes[offset], bytes[offset + 1]]) as usize
 }
 
+/// Rebuild one video-specific DOS EXE from the original compressed modules.
+/// The returned bytes still contain EXEPACK compression; unpacking is a separate step.
 pub fn combine(directory: &Path, video: &str) -> Result<Vec<u8>, Box<dyn Error>> {
     if !["MCGA", "CGA", "TDY", "EGA"].contains(&video) {
         return Err("Video mode must be MCGA, CGA, TDY, or EGA".into());
@@ -19,14 +22,18 @@ pub fn combine(directory: &Path, video: &str) -> Result<Vec<u8>, Box<dyn Error>>
     if pages == 0 || last > 511 {
         return Err("Invalid DOS executable size".into());
     }
+    // MZ page counts include the header; a zero last-page size denotes 512 bytes.
     let size = (pages - 1) * 512 + if last == 0 { 512 } else { last };
     let header_size = word(&header, 8) * 16;
     let mut common = decompress(&fs::read(directory.join("EGA.CMN"))?)?;
+    // EGA uses the common image directly. Other video modes patch it before
+    // appending their own code, reproducing the original module-loading layout.
     if video != "EGA" {
         let patch = decompress(&fs::read(directory.join(format!("{video}.DIF")))?)?;
         apply_difference(&mut common, &patch)?;
     }
     let code = decompress(&fs::read(directory.join(format!("{video}.COD")))?)?;
+    // Reject mismatched modules instead of emitting a silently truncated EXE.
     if header_size < header.len() || header_size + common.len() + code.len() != size {
         return Err("Module lengths do not match the DOS header".into());
     }
@@ -38,7 +45,10 @@ pub fn combine(directory: &Path, video: &str) -> Result<Vec<u8>, Box<dyn Error>>
     Ok(image)
 }
 
+/// Apply relative DIF replacement records to the decoded common module in place.
 fn apply_difference(image: &mut [u8], patch: &[u8]) -> Result<(), Box<dyn Error>> {
+    // The loader starts at offset -1. Express it modulo the 20-bit address space
+    // so a first delta of 1 writes at byte zero, matching segmented arithmetic.
     let mut cursor = 0xfffffusize;
     let mut position = 0;
     loop {
@@ -48,6 +58,7 @@ fn apply_difference(image: &mut [u8], patch: &[u8]) -> Result<(), Box<dyn Error>
         let record = u16::from_le_bytes([field[0], field[1]]) as usize;
         position += 2;
         if record == 0 {
+            // The terminator has no replacement payload.
             if position != patch.len() {
                 return Err("Unexpected data after DIF terminator".into());
             }
@@ -55,6 +66,7 @@ fn apply_difference(image: &mut [u8], patch: &[u8]) -> Result<(), Box<dyn Error>
         }
         // The original loader advances a wrapping 16:16 real-mode address.
         cursor = (cursor + (record & 0x7fff)) & 0xfffff;
+        // Low 15 bits advance the destination; bit 15 selects a four-byte write.
         let length = if record & 0x8000 != 0 { 4 } else { 2 };
         let data = patch
             .get(position..position + length)
@@ -64,6 +76,8 @@ fn apply_difference(image: &mut [u8], patch: &[u8]) -> Result<(), Box<dyn Error>
             .ok_or("DIF write outside common module")?
             .copy_from_slice(data);
         position += length;
+        // The destination stays at this record's start. The next delta is
+        // relative to that address, not the end of the replacement bytes.
     }
 }
 

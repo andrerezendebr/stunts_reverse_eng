@@ -18,6 +18,7 @@ public class ExportAnalysis extends GhidraScript {
         Path directory = Path.of(args[0]);
         Files.createDirectories(directory);
         String name = currentProgram.getName();
+        // Summaries expose the loader's memory layout and provisional analysis counts.
         try (PrintWriter out = new PrintWriter(Files.newBufferedWriter(directory.resolve(name + "-summary.txt"), StandardCharsets.UTF_8))) {
             out.println("Program: " + name);
             out.println("Language: " + currentProgram.getLanguageID());
@@ -32,6 +33,7 @@ public class ExportAnalysis extends GhidraScript {
             var entries = currentProgram.getSymbolTable().getExternalEntryPointIterator();
             while (entries.hasNext()) out.println(entries.next());
         }
+        // Address-ordered TSV provides a searchable inventory without the binary database.
         try (PrintWriter out = new PrintWriter(Files.newBufferedWriter(directory.resolve(name + "-functions.tsv"), StandardCharsets.UTF_8))) {
             out.println("address\tname\tbody_bytes");
             FunctionIterator functions = currentProgram.getFunctionManager().getFunctions(true);
@@ -41,6 +43,8 @@ public class ExportAnalysis extends GhidraScript {
             }
         }
         DecompInterface decompiler = new DecompInterface();
+        // Export a bounded sample, not the entire game. Each function gets a timeout
+        // because inferred types or boundaries can make decompilation expensive.
         try (PrintWriter out = new PrintWriter(Files.newBufferedWriter(directory.resolve(name + "-sample.c"), StandardCharsets.UTF_8))) {
             out.println("/* Automatically generated Ghidra pseudocode. Types and function boundaries are not verified. */");
             decompiler.openProgram(currentProgram);
@@ -53,6 +57,7 @@ public class ExportAnalysis extends GhidraScript {
                 else out.println("/* " + result.getErrorMessage() + " */");
             }
         } finally {
+            // The decompiler owns a native process; release it even if writing fails.
             decompiler.dispose();
         }
     }
