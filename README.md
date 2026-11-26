@@ -9,9 +9,10 @@ A partial native port of the original DOS game, using Ghidra for analysis and or
 - Reconstruction of the original DOS executables for MCGA, CGA, Tandy and EGA.
 - Complete speed and grip kernels, gearbox/torque/RPM handling, steering, exact trigonometry, matrices, rotations and random state.
 - Original player-physics preparation and four-wheel prediction, checked against 704 original-code cases across all eleven cars. Original terrain contact, suspension resolution and final world integration remain pending.
-- Optional desktop prototype: keyboard driving, software-rendered original Indy polygons, chase camera, minimap, experimental spring/damper suspension and boundary collisions. Track geometry is schematic and flat.
+- Optional desktop prototype: keyboard driving, original track/terrain/scenery meshes and Indy polygons, chase camera, minimap, experimental suspension against scene triangles and swept wall collisions.
+- Original slope-road substitution validated against all 65,536 byte input pairs; scene metadata extracted directly from the unchanged executable.
 - Native control traces checked against 6600 sequential frames of original DOS function execution.
-- **40 tests with the desktop feature**: 39 library tests plus a framebuffer scene test, including original-code vectors, sequential state comparisons, shape truncation checks, experimental driving and failure rollback.
+- **47 tests with the desktop feature**: 45 library tests plus two rendering tests, including original-code vectors, uphill suspension, wall/bridge contacts, scene parsing, near-plane clipping and failure rollback.
 
 ## Run
 
@@ -60,7 +61,7 @@ The output file must not already exist. This CLI command runs control calculatio
 - [Gearbox, torque and RPM stages](docs/drivetrain.md)
 - [Complete speed/grip kernels and numerical foundations](docs/speed-grip-numerics.md)
 
-Next major work: remaining `update_player_state` physics, original terrain/contact planes, authentic track meshes and materials, full replay world-state comparison, opponents and audio. The experimental solver must not be treated as evidence that those original routines are ported.
+Next major work: remaining `update_player_state` physics, original terrain/contact planes, authentic materials and special rendering rules, full replay world-state comparison, opponents and audio. The experimental solver must not be treated as evidence that those original routines are ported.
 
 ## References
 

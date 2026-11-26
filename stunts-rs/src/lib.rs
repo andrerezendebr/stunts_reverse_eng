@@ -16,6 +16,7 @@ pub mod prototype;
 pub mod random;
 pub mod replay;
 pub mod resource;
+pub mod scene;
 pub mod shape;
 pub mod simulation;
 mod sine_table;

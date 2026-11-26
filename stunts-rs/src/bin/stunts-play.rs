@@ -9,6 +9,7 @@ use stunts_rs::{
     compression, drivetrain,
     prototype::{World, STEP, TILE},
     resource::Archive,
+    scene::Scene,
     shape::Shape,
     track::Track,
 };
@@ -30,7 +31,7 @@ impl Renderer {
             heading: 0.0,
         }
     }
-    fn project(&self, p: [f32; 3]) -> Option<[f32; 3]> {
+    fn camera_point(&self, p: [f32; 3]) -> [f32; 3] {
         let dx = p[0] - self.camera[0];
         let dy = p[1] - self.camera[1];
         let dz = p[2] - self.camera[2];
@@ -39,25 +40,45 @@ impl Renderer {
         // A fixed downward chase-camera pitch keeps the road in view.
         let y = dy * 0.96 + forward * 0.28;
         let z = forward * 0.96 - dy * 0.28;
-        if z < 0.25 {
-            return None;
-        }
-        Some([
-            W as f32 / 2.0 + x * 650.0 / z,
-            H as f32 * 0.47 - y * 650.0 / z,
-            1.0 / z,
-        ])
+        [x, y, z]
     }
     fn triangle(&mut self, pts: [[f32; 3]; 3], color: u32) {
-        let Some(a) = self.project(pts[0]) else {
-            return;
+        let camera = pts.map(|p| self.camera_point(p));
+        let mut clipped = Vec::with_capacity(4);
+        // Clip in camera space before perspective division. A triangle crossing
+        // the near plane becomes a triangle or quad instead of disappearing.
+        for i in 0..3 {
+            let a = camera[i];
+            let b = camera[(i + 1) % 3];
+            if a[2] >= 0.25 {
+                clipped.push(a);
+            }
+            if (a[2] >= 0.25) != (b[2] >= 0.25) {
+                let t = (0.25 - a[2]) / (b[2] - a[2]);
+                clipped.push(std::array::from_fn(|axis| {
+                    a[axis] + t * (b[axis] - a[axis])
+                }));
+            }
+        }
+        let project = |p: [f32; 3]| {
+            [
+                W as f32 / 2.0 + p[0] * 650.0 / p[2],
+                H as f32 * 0.47 - p[1] * 650.0 / p[2],
+                1.0 / p[2],
+            ]
         };
-        let Some(b) = self.project(pts[1]) else {
-            return;
-        };
-        let Some(c) = self.project(pts[2]) else {
-            return;
-        };
+        for i in 1..clipped.len().saturating_sub(1) {
+            self.raster(
+                [
+                    project(clipped[0]),
+                    project(clipped[i]),
+                    project(clipped[i + 1]),
+                ],
+                color,
+            );
+        }
+    }
+    fn raster(&mut self, [a, b, c]: [[f32; 3]; 3], color: u32) {
         let edge = |p: [f32; 3], q: [f32; 3], x: f32, y: f32| {
             (x - p[0]) * (q[1] - p[1]) - (y - p[1]) * (q[0] - p[0])
         };
@@ -77,7 +98,10 @@ impl Renderer {
                 if u >= 0.0 && v >= 0.0 && t >= 0.0 {
                     let z = 1.0 / (u * a[2] + v * b[2] + t * c[2]);
                     let i = y * W + x;
-                    if z < self.depth[i] {
+                    // Original roads and markings are coplanar with terrain.
+                    // A small depth tolerance lets their later draw order win
+                    // without changing geometry used by suspension contacts.
+                    if z < self.depth[i] + 0.01 {
                         self.depth[i] = z;
                         self.pixels[i] = color;
                     }
@@ -89,18 +113,7 @@ impl Renderer {
         self.triangle([p[0], p[1], p[2]], color);
         self.triangle([p[0], p[2], p[3]], color);
     }
-    fn ground(&mut self, x: f32, z: f32, half: f32, y: f32, color: u32) {
-        self.quad(
-            [
-                [x - half, y, z - half],
-                [x + half, y, z - half],
-                [x + half, y, z + half],
-                [x - half, y, z + half],
-            ],
-            color,
-        );
-    }
-    fn render(&mut self, world: &World, track: &Track<'_>, shape: &Shape) {
+    fn render(&mut self, world: &World, track: &Track<'_>, shape: &Shape, scene: &Scene) {
         self.pixels.fill(0x82b8d8);
         self.depth.fill(f32::INFINITY);
         self.heading = world.heading;
@@ -109,33 +122,9 @@ impl Renderer {
             world.position[1] + 4.5,
             world.position[2] + world.heading.cos() * 11.0,
         ];
-        // Subdivide tiles to keep near-plane rejection local. Original track
-        // elements are shown as schematic square patches, not authentic meshes.
-        let cx = (world.position[0] / TILE) as i32;
-        let cz = (world.position[2] / TILE) as i32;
-        for z in (cz - 5).max(0)..=(cz + 5).min(29) {
-            for x in (cx - 5).max(0)..=(cx + 5).min(29) {
-                let tile = track.element(x as usize, z as usize).unwrap();
-                for sz in 0..6 {
-                    for sx in 0..6 {
-                        let road = tile != 0 && (sx == 2 || sx == 3 || sz == 2 || sz == 3);
-                        let color = if road {
-                            0x62656a
-                        } else if (x + z) % 2 == 0 {
-                            0x498147
-                        } else {
-                            0x447a42
-                        };
-                        self.ground(
-                            x as f32 * TILE + sx as f32 * 10.0 + 5.0,
-                            z as f32 * TILE + sz as f32 * 10.0 + 5.0,
-                            5.0,
-                            0.0,
-                            color,
-                        );
-                    }
-                }
-            }
+        for index in scene.nearby(world.position[0], world.position[2], 6) {
+            let triangle = &scene.triangles[index];
+            self.triangle(triangle.points, triangle.color);
         }
         // Mesh vertices are original signed DOS coordinates. Only model scale,
         // palette and the chase-camera transform are provisional.
@@ -237,7 +226,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .and_then(|i| args.get(i + 1))
     };
     if args.iter().any(|a| a == "--help") {
-        println!("stunts-play [--data PATH] [--track NAME.TRK] [--frames N] [--headless] [--screenshot FILE.ppm]\nArrows/WASD: drive and brake; R: reset; Escape: exit.\nExperimental world physics; schematic track geometry; original car polygons.");
+        println!("stunts-play [--data PATH] [--track NAME.TRK] [--frames N] [--headless] [--screenshot FILE.ppm]\nArrows/WASD: drive and brake; R: reset; Escape: exit.\nOriginal track/car meshes; experimental triangle contacts and world physics.");
         return Ok(());
     }
     let root = value("--data")
@@ -252,6 +241,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let archive = Archive::parse(&model_bytes)?;
     let shape = Shape::parse(archive.get(b"car0").ok_or("Missing car0 mesh")?)?;
     let mut world = World::new(&car, &track)?;
+    let scene = Scene::load(&root, &track)?;
+    world.place_on_scene(&scene);
     let mut renderer = Renderer::new();
     let limit = value("--frames").map(|n| n.parse::<usize>()).transpose()?;
     let headless = args.iter().any(|a| a == "--headless");
@@ -306,14 +297,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         accumulator += (now - previous).min(Duration::from_millis(250));
         previous = now;
         if headless {
-            world.tick(&car, &track, input)?;
+            world.tick_scene(&car, &track, &scene, input)?;
         } else {
             while accumulator >= Duration::from_secs_f32(STEP) {
-                world.tick(&car, &track, input)?;
+                world.tick_scene(&car, &track, &scene, input)?;
                 accumulator -= Duration::from_secs_f32(STEP);
             }
         }
-        renderer.render(&world, &track, &shape);
+        renderer.render(&world, &track, &shape, &scene);
         if let Some(w) = window.as_mut() {
             w.set_title(&format!("Stunts Rust EXPERIMENTAL | speed {:.1} raw/256 | RPM {} | gear {} | contacts {} | hits {} | WASD / R / Esc",world.state.word(drivetrain::SPEED2)as f32/256.0,world.state.word(0x22),world.state.0[0xbe],world.contacts,world.collisions));
             w.update_with_buffer(&renderer.pixels, W, H)?;
@@ -334,6 +325,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 mod tests {
     use super::*;
     #[test]
+    fn near_plane_clips_crossing_triangles_and_rejects_geometry_behind_camera() {
+        let mut renderer = Renderer::new();
+        renderer.triangle(
+            [[-0.5, 0.0, -0.5], [0.5, 0.0, -0.5], [0.0, -0.3, 0.5]],
+            0x123456,
+        );
+        assert!(renderer.pixels.iter().any(|&p| p == 0x123456));
+        renderer.pixels.fill(0);
+        renderer.depth.fill(f32::INFINITY);
+        renderer.triangle(
+            [[-0.5, 0.0, 1.0], [0.5, 0.0, 1.0], [0.0, 0.5, 1.0]],
+            0x123456,
+        );
+        assert!(renderer.pixels.iter().all(|&p| p == 0));
+    }
+    #[test]
     fn framebuffer_contains_ground_and_original_car_and_changes_when_driving() {
         let car = Car::parse(include_bytes!("../../../stunts_dos/CARPMIN.RES")).unwrap();
         let track = Track::parse(include_bytes!("../../../stunts_dos/HELL5.TRK")).unwrap();
@@ -342,15 +349,21 @@ mod tests {
         let archive = Archive::parse(&model).unwrap();
         let shape = Shape::parse(archive.get(b"car0").unwrap()).unwrap();
         let mut world = World::new(&car, &track).unwrap();
+        let scene = Scene::load(
+            &PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../stunts_dos"),
+            &track,
+        )
+        .unwrap();
+        world.place_on_scene(&scene);
         let mut renderer = Renderer::new();
-        renderer.render(&world, &track, &shape);
+        renderer.render(&world, &track, &shape, &scene);
         assert!(renderer.pixels.iter().filter(|&&p| p == 0xdf3030).count() > 100);
         assert!(renderer.depth.iter().filter(|d| d.is_finite()).count() > 100000);
         let first = renderer.pixels.clone();
         for _ in 0..80 {
-            world.tick(&car, &track, 1).unwrap();
+            world.tick_scene(&car, &track, &scene, 1).unwrap();
         }
-        renderer.render(&world, &track, &shape);
+        renderer.render(&world, &track, &shape, &scene);
         assert!(
             first
                 .iter()

@@ -24,28 +24,71 @@ on PATH. Original game files are opened for reading only.
 `prototype.rs` calls the verified speed, steering and detailed grip kernels at
 20 Hz. Its world motion is an explicitly new floating-point bicycle model;
 speed-to-world conversion, wheelbase and steering calibration are provisional.
-Four spring/damper contacts support the car on a flat plane and body pitch/roll
-follow approximate load transfer. Crossing the enclosing map boundary clamps
-position and stops the car. The prototype has no collisions with original
-scenery, opponents, walls or track obstacles. It does not yet implement original
-jumps, bridges, banked roads, loops, damage, reverse driving, timing or sound.
-Original terrain height data is parsed by the library but not used by this solver.
+Four spring/damper contacts sample the loaded original scene triangles. Pitch
+and roll follow the sampled road slope plus approximate load transfer. Each
+wheel supplies its own surface code to the verified grip kernel. The highest
+support within reach is selected, so a car can stay on the lower road beneath
+a bridge instead of jumping onto its deck. Contact reach grows with one tick
+of travel to avoid skipping slopes at speed. A floor clamp prevents deep
+penetration; this is still an approximate solver, not original suspension.
+
+Three points spanning the car's width sweep against near-vertical mesh faces;
+on impact the car returns to its previous position and speed is cleared.
+The independent map boundary also clamps position. These checks reduce wall
+tunnelling but do not reproduce the original collision hull or response.
+Overhead and banked geometry can be displayed, but inverted loop driving,
+original jump trajectories, damage, opponents, reverse driving, timing and sound
+remain unimplemented. Water is not yet a distinct physical hazard. Degenerate
+and specialized non-polygon scene primitives are omitted. Contact queries use
+visible mesh faces rather than the original physical-model planes, and can
+therefore differ from the DOS game around scenery, bridges and stunt elements.
 
 Rendering uses a depth buffer and perspective projection. It reads the original
 Indy `STPMIN.P3S` archive, parses `car0` vertex/primitive records and draws its
 polygons. Wheel primitives are provisional defining faces rather than the
-original specialized wheel rasterizer. Colors are an arbitrary prototype
-palette; primitive visibility masks, original paint tables and near-plane
-polygon clipping are not reproduced. Polygons crossing the near plane are
-discarded. Track elements are flat cross-shaped schematic patches, including
-unsupported objects; the scene is not an authentic rendering of the track.
-Ground-surface classification is likewise coarse. Missing start tile 0x01 falls
-back to the center of the map; other original start orientations remain unmapped.
+original specialized wheel rasterizer. The original GAME1/GAME2.P3S models now
+supply track pieces, terrain and scenery. Placement uses the original object
+table, quadrant rotations, overlays, paint-job indices and multi-tile origins.
+Near-plane clipping keeps partially visible polygons, and a small depth
+tolerance reduces coplanar road/grass flicker. Colors are an approximate palette;
+original material tables, dithering, visibility masks, scenery fences and special
+elevated-corner terrain rules are not fully reproduced. Missing/unsupported start
+tiles fall back to the map center; plain, dirt, ice, highway and pipe start
+orientations are recognized. Start position/height is provisional rather than
+the original complete grid initialization.
 
 This prototype makes movement visible while the remaining DOS physics is being
 mapped. Passing its tests does not validate it against original game replays.
 
 ## New original-code mapping
+
+`tools/extract-scene.mjs` validates the reconstructed MCGA SHA256 and extracts
+116 four-byte shape IDs, 215 object records and 19 terrain records into the
+3740-byte `scene_metadata.bin`. It does not copy reference source or databases.
+The extracted bytes were regenerated and checked for equality.
+
+| Original address | Data |
+| --- | --- |
+| `3B77:0A50` | 116 names stored at a five-byte stride |
+| `3B77:2098` | 215 object records at a fourteen-byte stride |
+| `3B77:2C5A` | 19 terrain records |
+| `3B77:764C` | Runtime SHAPE3D array, stride 22 |
+| `1E1A:38BA` | `subst_hillroad_track`, complete Rust port |
+
+`scene::hillroad` maps compatible roads on terrain IDs 7..10 to internal IDs
+B6..C5 before mesh placement. All **65,536 byte input pairs** match execution
+of the original function in `tools/verify_hillroad.py`; the raw result fixture
+is committed as `hillroad-dos.bin`. This is a port of original behavior, distinct
+from the experimental triangle contact solver.
+
+Original initialization sets `trackrows[i]=30*(29-i)`, `terrainrows[i]=30*i`, and
+`trackcenterpos[i]=(29-i)*1024+512`. Consequently a raw file element row y has
+world Z `y*1024+512`: local mesh Z must not be mirrored. Two-row pieces anchor
+at raw row y's lower edge and span y-1 through y; two-column pieces span x
+through x+1. The prototype's 60-unit tile gives a mesh scale of 60/1024. Plateau
+height is the original 450 units before scaling. Terrain record zero is a fence
+helper and must not be rendered for every blank tile. `MapScene.java` records
+these tables and the verified substitution routine in the ignored Ghidra database.
 
 `motion::predict_wheels` extends the previously validated prefix of
 `update_player_state` from physical address `14ECE` through `1513E` (exclusive).
@@ -87,3 +130,7 @@ Headless mode requires a finite frame count and applies acceleration at each
 time for physics. Screenshot files use binary PPM and must not already exist.
 Screenshots, executables, downloaded dependencies and Ghidra databases remain
 outside Git. `Cargo.lock` records the optional desktop dependency graph.
+
+Regression tests cover original ramp/slope heights, driving uphill at speed,
+unobstructed original straight roads, bridge contact selection, swept wall
+collisions, start orientation/reset, framebuffer content and near-plane clipping.
