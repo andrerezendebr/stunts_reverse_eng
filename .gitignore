@@ -1,7 +1,7 @@
-# Bancos locais de engenharia reversa
+# Local reverse engineering databases
 /reverse/
 
-# Build Rust e configurações locais
+# Rust build output and local settings
 **/target/
 .env
 .env.*

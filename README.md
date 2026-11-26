@@ -1,12 +1,12 @@
-# Stunts em Rust
+# Stunts in Rust
 
-Projeto inicial de reimplementação de Stunts para DOS em Rust, com apoio do Ghidra para estudar as rotinas originais.
+An early-stage reimplementation of Stunts for DOS in Rust, using Ghidra to study the original routines.
 
-O projeto ainda não executa o jogo. A ferramenta atual lista arquivos e inspeciona cabeçalhos DOS MZ e strings ASCII.
+The project cannot run the game yet. The current tool lists files and inspects DOS MZ headers and ASCII strings.
 
-## Executar
+## Running
 
-Instale o toolchain Rust. Os arquivos originais do jogo estão na pasta `stunts_dos/`, na raiz do repositório.
+Install the Rust toolchain. The original game files are in the `stunts_dos/` folder at the repository root.
 
 ```powershell
 cd stunts-rs
@@ -15,23 +15,23 @@ cargo run -- inspect ..\stunts_dos\LOAD.EXE
 cargo run -- inspect ..\stunts_dos\MCGA.HDR
 ```
 
-## Organização
+## Layout
 
-- `stunts-rs/`: código Rust das ferramentas de análise e da futura reimplementação.
-- `stunts_dos/`: arquivos originais do jogo, incluídos no Git para análise.
-- `reverse/`: projeto Ghidra e registros locais, excluídos do Git.
+- `stunts-rs/`: Rust source for the analysis tools and future reimplementation.
+- `stunts_dos/`: original game files, included in Git for analysis.
+- `reverse/`: local Ghidra project and analysis records, excluded from Git.
 
-## Etapas previstas
+## Planned steps
 
-1. Confirmar a versão e estudar o carregamento e a descompressão dos módulos.
-2. Reconstruir uma imagem estática para análise no Ghidra.
-3. Implementar leitores dos recursos com formatos confirmados.
-4. Portar matemática e física preservando o comportamento dos inteiros do DOS.
-5. Comparar estados por frame usando replays antes de integrar vídeo, entrada e áudio.
+1. Identify the game version and study module loading and decompression.
+2. Reconstruct a static image for analysis in Ghidra.
+3. Implement resource readers using confirmed formats.
+4. Port math and physics while preserving DOS integer behavior.
+5. Compare per-frame states using replays before integrating graphics, input, and audio.
 
-## Referências
+## References
 
 - [ReStunts](https://github.com/4d-stunts/restunts)
 - [ReStunts2](https://github.com/dstien/restunts2)
 
-Os executáveis e recursos em `stunts_dos/` pertencem aos respectivos titulares. Sua inclusão não altera a titularidade desses arquivos.
+The executables and resources in `stunts_dos/` belong to their respective rights holders. Their inclusion does not change ownership of these files.
