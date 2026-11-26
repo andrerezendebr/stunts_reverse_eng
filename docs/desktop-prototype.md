@@ -10,7 +10,7 @@ Windows message dialog. The separate `stunts-rs` analysis CLI retains its consol
 
 ## Play
 
-Run `./play.ps1` from PowerShell, or build with:
+Run `./play.ps1 -Software` from PowerShell, or build with:
 
 ```powershell
 cargo build --release --manifest-path stunts-rs/Cargo.toml --features desktop --bin stunts-play

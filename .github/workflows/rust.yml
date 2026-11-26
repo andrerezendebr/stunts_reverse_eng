@@ -1,0 +1,18 @@
+name: Rust Windows and Linux
+on: [push, pull_request]
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Linux window dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev
+      - name: Verify simulation and both frontends
+        run: cargo test --locked --manifest-path stunts-rs/Cargo.toml --features desktop,modern
+      - name: Build GPU application
+        run: cargo build --locked --release --manifest-path stunts-rs/Cargo.toml --features modern --bin stunts-modern

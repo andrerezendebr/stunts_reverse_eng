@@ -8,11 +8,11 @@ use std::{
     path::PathBuf,
     time::{Duration, Instant},
 };
+#[cfg(test)]
+use stunts_rs::{car::Car, compression, resource::Archive};
 use stunts_rs::{
-    car::Car,
-    compression, drivetrain,
+    drivetrain,
     prototype::{World, TILE},
-    resource::Archive,
     scene::Scene,
     shape::Shape,
     track::Track,
@@ -224,80 +224,37 @@ impl Renderer {
     }
 }
 
-/// Own the selected resources so changing a menu selection cannot mutate the
-/// active race. Build the replacement fully before swapping it into the game.
-struct Race {
-    world: World,
-    scene: Scene,
-    track_bytes: Vec<u8>,
-    car_bytes: Vec<u8>,
-    shape: Shape,
-}
-impl Race {
-    fn load(root: &std::path::Path, catalog: &Catalog, menu: &Menu) -> Result<Self, String> {
-        let track_bytes = catalog.tracks[menu.track].bytes.clone();
-        let track = Track::parse(&track_bytes)?;
-        let choice = &catalog.cars[menu.car];
-        let car_bytes = std::fs::read(root.join(&choice.file)).map_err(|e| e.to_string())?;
-        let car = Car::parse(&car_bytes)?;
-        let model =
-            compression::decompress(&std::fs::read(&choice.model).map_err(|e| e.to_string())?)?;
-        let archive = Archive::parse(&model)?;
-        let shape = Shape::parse(archive.get(b"car0").ok_or("Missing car0 mesh")?)?;
-        let mut world = World::new(&car, &track)?;
-        let scene = Scene::load(root, &track)?;
-        world.place_on_scene(&scene);
-        Ok(Self {
-            world,
-            scene,
-            track_bytes,
-            car_bytes,
-            shape,
-        })
-    }
-    fn tick(&mut self, input: u8) -> Result<(), String> {
-        self.world.tick_scene(
-            &Car::parse(&self.car_bytes)?,
-            &Track::parse(&self.track_bytes)?,
-            &self.scene,
-            input,
-        )
-    }
-    fn reset(&mut self) -> Result<(), String> {
-        self.world.reset(&Car::parse(&self.car_bytes)?)
-    }
-    fn draw(&self, renderer: &mut Renderer) {
-        renderer.render(
-            &self.world,
-            &Track::parse(&self.track_bytes).unwrap(),
-            &self.shape,
-            &self.scene,
-        );
-        menu::text(
-            &mut renderer.pixels,
-            W,
-            155,
-            18,
-            &format!(
-                "SPEED {:3}  RPM {:5}  GEAR {}",
-                self.world.state.word(drivetrain::SPEED2) / 256,
-                self.world.state.word(0x22),
-                self.world.state.0[0xbe]
-            ),
-            2,
-            0xffffff,
-        );
-        menu::rect(&mut renderer.pixels, W, 12, H - 58, 144, 38, 0x18283c);
-        menu::text(
-            &mut renderer.pixels,
-            W,
-            20,
-            H - 48,
-            "ESC PAUSE",
-            2,
-            0xffffff,
-        );
-    }
+fn draw_race(race: &stunts_rs::session::Session, renderer: &mut Renderer) {
+    renderer.render(
+        &race.world,
+        &Track::parse(&race.track_bytes).unwrap(),
+        &race.shape,
+        &race.scene,
+    );
+    menu::text(
+        &mut renderer.pixels,
+        W,
+        155,
+        18,
+        &format!(
+            "SPEED {:3}  RPM {:5}  GEAR {}",
+            race.world.state.word(drivetrain::SPEED2) / 256,
+            race.world.state.word(0x22),
+            race.world.state.0[0xbe]
+        ),
+        2,
+        0xffffff,
+    );
+    menu::rect(&mut renderer.pixels, W, 12, H - 58, 144, 38, 0x18283c);
+    menu::text(
+        &mut renderer.pixels,
+        W,
+        20,
+        H - 48,
+        "ESC PAUSE",
+        2,
+        0xffffff,
+    );
 }
 
 /// Menus discard elapsed simulation time. Resuming must never replay the time
@@ -396,7 +353,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         && !args.iter().any(|a| a == "--menu-preview");
     let mut race = if skip_menu {
         menu.screen = Screen::Racing;
-        Some(Race::load(&root, &catalog, &menu)?)
+        Some(stunts_rs::session::Session::load(
+            &root, &catalog, menu.track, menu.car,
+        )?)
     } else {
         None
     };
@@ -489,14 +448,16 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         match command {
             Command::Pause => menu.pause(),
             Command::Quit => break,
-            Command::Start => match Race::load(&root, &catalog, &menu) {
-                Ok(next) => {
-                    race = Some(next);
-                    menu.screen = Screen::Racing;
-                    menu.error = None;
+            Command::Start => {
+                match stunts_rs::session::Session::load(&root, &catalog, menu.track, menu.car) {
+                    Ok(next) => {
+                        race = Some(next);
+                        menu.screen = Screen::Racing;
+                        menu.error = None;
+                    }
+                    Err(error) => menu.error = Some(error),
                 }
-                Err(error) => menu.error = Some(error),
-            },
+            }
             Command::Resume => {
                 if race.is_some() {
                     menu.screen = Screen::Racing;
@@ -524,7 +485,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     race.tick(input)?;
                 }
             }
-            race.draw(&mut renderer);
+            draw_race(race, &mut renderer);
         } else {
             menu.draw(&mut renderer.pixels, W, H, &catalog);
         }

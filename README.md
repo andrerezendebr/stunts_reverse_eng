@@ -1,6 +1,6 @@
 # Stunts reverse engineering in Rust
 
-A partial native port of the original DOS game, using Ghidra for analysis and original x86 execution to validate behavior. The project provides a reusable Rust library, an analysis CLI and a **playable experimental desktop prototype**. Full original-game physics and track rendering are still being reconstructed.
+A partial native port of the original DOS game, using Ghidra for analysis and original x86 execution to validate behavior. The project provides a reusable Rust library, an analysis CLI and **experimental GPU and software frontends**. Full original-game physics and rendering are still being reconstructed.
 
 ## Implemented
 
@@ -13,7 +13,8 @@ A partial native port of the original DOS game, using Ghidra for analysis and or
 - Original slope-road substitution validated against all 65,536 byte input pairs; scene metadata extracted directly from the unchanged executable.
 - Native control traces checked against 6600 sequential frames of original DOS function execution.
 - Native main/pause menus with all 41 tracks and 11 cars, track preview, controls and race restart. Opening a menu freezes simulation time.
-- **52 tests with the desktop feature**: 45 library tests plus seven desktop tests, including original-code vectors, mouse/keyboard menus, resized click regions, pause/resume timing, terrain contacts and rendering.
+- Modern wgpu rendering with GPU vertex buffers, depth testing, original meshes, optional directional lighting, egui menus and glam camera transforms. Window/input integration uses winit through eframe.
+- **53 tests with both frontend features**: 45 library tests, seven software desktop tests and a GPU mesh/camera test. Original CPU fixtures remain independent of the rendering backend.
 
 ## Run
 
@@ -22,10 +23,14 @@ To build and play the experimental Windows prototype from the repository root:
 ```powershell
 .\play.ps1
 # Or, with a normal Rust installation:
-cargo run --release --manifest-path stunts-rs/Cargo.toml --features desktop --bin stunts-play -- --data stunts_dos
+cargo run --release --manifest-path stunts-rs/Cargo.toml --features modern --bin stunts-modern -- --data stunts_dos
+# Retain the original software frontend:
+.\play.ps1 -Software
 ```
 
-The game opens at its main menu. **Point and click** to choose an option; click **< / >** to change track/car. Keyboard navigation also works: **Up/Down** selects, **Left/Right** changes track/car and **Enter** confirms. Driving: **W/Up** accelerate, **S/Down** brake, **A/Left** and **D/Right** steer, **R** reset, **Escape** pause. The on-screen pause button is clickable. The pause menu offers resume, restart, main menu and exit. The Windows executable is `stunts-rs/target/release/stunts-play.exe`. `--track NAME.TRK` and `--car CARXXXX.RES` set the initial menu choices; `--quick-start` bypasses the menu. See [prototype status and validation](docs/desktop-prototype.md) for the current limits.
+On Linux, run `sh modern.sh` or use the same Cargo command with `--features modern`.
+
+The game opens at its main menu. Use the mouse to select the track/car and start a race. Driving: **W/Up** accelerate, **S/Down** brake, **A/Left** and **D/Right** steer, **R** reset, **Escape** pause. The pause menu offers resume, restart, main menu and exit. The GPU executable is `stunts-rs/target/release/stunts-modern.exe`; the software frontend remains `stunts-play.exe`. `--track NAME.TRK` and `--car CARXXXX.RES` set initial choices; `--quick-start` bypasses the menu. See [modernization status](docs/modernization.md) and [simulation limits](docs/desktop-prototype.md).
 
 With Rust installed, from the repository root:
 
@@ -44,7 +49,7 @@ cargo build --release --manifest-path stunts-rs/Cargo.toml
 .\stunts-rs\target\release\stunts-rs.exe control-trace stunts_dos/CARPMIN.RES 20 150 reverse/decoded/INDY-control-native.csv
 ```
 
-The output file must not already exist. This CLI command runs control calculations without position integration, suspension, collisions or graphics. Values are raw game quantities, not real-world telemetry. Default library/CLI builds have no third-party runtime dependencies; the optional desktop feature uses minifb. Optional Python/Unicorn tools regenerate development fixtures.
+The output file must not already exist. This CLI command runs control calculations without position integration, suspension, collisions or graphics. Values are raw game quantities, not real-world telemetry. Default library/CLI builds have no third-party runtime dependencies; optional frontends use minifb (`desktop`) or wgpu/egui (`modern`). Optional Python/Unicorn tools regenerate development fixtures.
 
 ## Layout
 
