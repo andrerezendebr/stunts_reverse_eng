@@ -1,0 +1,10 @@
+# Arquivos originais e bancos locais de engenharia reversa
+/stunts_dos/
+/reverse/
+
+# Build Rust e configurações locais
+**/target/
+.env
+.env.*
+.idea/
+.vscode/

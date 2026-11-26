@@ -1,0 +1,7 @@
+[package]
+name = "stunts-rs"
+version = "0.1.0"
+edition = "2021"
+description = "Ferramentas de investigação para a reimplementação de Stunts em Rust"
+
+[dependencies]
