@@ -2,7 +2,7 @@
 
 Analysis date: 2026-11-26. This continues [drivetrain mapping](drivetrain.md). `reverse/` remains local and excluded from Git.
 
-The native library now ports complete `update_car_speed` and `update_grip`, exact table-based trigonometry, matrix operations, rotation builders and the six-byte random generator. A harness executes speed, steering and grip in sequence and exports CSV. World motion, suspension, collisions, opponents, complete `player_op`, rendering and audio remain unimplemented. These control traces are not race replays or a playable game.
+The native library now ports complete `update_car_speed` and `update_grip`, exact table-based trigonometry, matrix operations, rotation builders and the six-byte random generator. A harness executes speed, steering and grip in sequence and exports CSV. Original world integration, suspension/contact resolution, collisions, opponents, complete `player_op` and audio remain unimplemented. A separate [experimental desktop prototype](desktop-prototype.md) supplies provisional world physics and graphics. These control traces are not race replays.
 
 ## Original-code validation
 
@@ -20,6 +20,7 @@ All expected results come from execution of the original DOS instructions in Uni
 | Random generator | 1280 | Output and all six seed bytes |
 | Composed rotations | 756 | Both orders, skipped axes and original Y-matrix cache |
 | Motion preparation prefix | 512 | State writes and local preparation values |
+| Extended wheel prediction | 704 | State, four base/predicted wheel vectors, inverted adjustment |
 
 The suite now has **36 passing tests**, retaining previous format and component checks. Isolated cases include word boundaries, signed overflow, airborne branches, braking, shifts and opponent modifiers. Sequential comparisons keep state between calls and compare every frame.
 
@@ -106,4 +107,6 @@ analyzeHeadless reverse/projects Stunts -process MCGA.exe -noanalysis -scriptPat
 
 The bounded preparation prefix of `update_player_state` is now ported as `motion::prepare`, stopping at `1471:07BE` (linear `14ECE`). It copies previous position and computes speed scale, front-angle quartering, composed rotations and pseudo-gravity. All state writes and the two stack-local scale values match 512 original-code cases. The oracle initializes the four predefined Y matrices by calling original rotation builders and sets SS=DS when stack-local vectors are passed through near pointers. A cold executable image alone does not satisfy these initialization preconditions. Composed rotations additionally match 756 original cases. This prefix is not called by the control harness and does not integrate position.
 
-Next major dependency: the remainder of `update_player_state`, including world motion, wheel/suspension geometry, terrain planes and collisions. Verified math helpers reduce that work but do not replace it. Full replay initialization and world-state comparisons also remain pending.
+The extended `motion::predict_wheels` prefix now continues through `1471:0A2E` (linear `1513E`), including wheel/suspension attachment geometry and travel prediction. It matches 704 original cases; see [the detailed boundary and oracle contract](desktop-prototype.md#new-original-code-mapping).
+
+Next major dependency: the remainder of `update_player_state`, including terrain planes, contact resolution, final world integration and collisions. Verified math helpers reduce that work but do not replace it. Full replay initialization and world-state comparisons also remain pending.

@@ -1,6 +1,6 @@
 # Stunts reverse engineering in Rust
 
-A partial native port of the original DOS game, using Ghidra for analysis and original x86 execution to validate behavior. The current project provides a reusable Rust library and an analysis CLI. It is **not a playable game yet**.
+A partial native port of the original DOS game, using Ghidra for analysis and original x86 execution to validate behavior. The project provides a reusable Rust library, an analysis CLI and a **playable experimental desktop prototype**. Full original-game physics and track rendering are still being reconstructed.
 
 ## Implemented
 
@@ -8,11 +8,22 @@ A partial native port of the original DOS game, using Ghidra for analysis and or
 - Readers for all 41 tracks, the default replay, and parameters for all eleven cars.
 - Reconstruction of the original DOS executables for MCGA, CGA, Tandy and EGA.
 - Complete speed and grip kernels, gearbox/torque/RPM handling, steering, exact trigonometry, matrices, rotations and random state.
-- A bounded preparation prefix of player physics; full world movement, suspension and collisions remain pending.
+- Original player-physics preparation and four-wheel prediction, checked against 704 original-code cases across all eleven cars. Original terrain contact, suspension resolution and final world integration remain pending.
+- Optional desktop prototype: keyboard driving, software-rendered original Indy polygons, chase camera, minimap, experimental spring/damper suspension and boundary collisions. Track geometry is schematic and flat.
 - Native control traces checked against 6600 sequential frames of original DOS function execution.
-- **36 tests**, including original-code vectors, sequential state comparisons, format validation and failure rollback.
+- **40 tests with the desktop feature**: 39 library tests plus a framebuffer scene test, including original-code vectors, sequential state comparisons, shape truncation checks, experimental driving and failure rollback.
 
 ## Run
+
+To build and play the experimental Windows prototype from the repository root:
+
+```powershell
+.\play.ps1
+# Or, with a normal Rust installation:
+cargo run --release --manifest-path stunts-rs/Cargo.toml --features desktop --bin stunts-play -- --data stunts_dos
+```
+
+Controls: **W/Up** accelerate, **S/Down** brake, **A/Left** and **D/Right** steer, **R** reset, **Escape** exit. The Windows executable is `stunts-rs/target/release/stunts-play.exe`. Use `--track NAME.TRK` to select another original track. See [prototype status and validation](docs/desktop-prototype.md) for the current limits.
 
 With Rust installed, from the repository root:
 
@@ -31,7 +42,7 @@ cargo build --release --manifest-path stunts-rs/Cargo.toml
 .\stunts-rs\target\release\stunts-rs.exe control-trace stunts_dos/CARPMIN.RES 20 150 reverse/decoded/INDY-control-native.csv
 ```
 
-The output file must not already exist. This runs control calculations without position integration, suspension, collisions or graphics. Values are raw game quantities, not real-world telemetry. The library has no third-party runtime dependencies; optional Python/Unicorn tools regenerate the development fixtures.
+The output file must not already exist. This CLI command runs control calculations without position integration, suspension, collisions or graphics. Values are raw game quantities, not real-world telemetry. Default library/CLI builds have no third-party runtime dependencies; the optional desktop feature uses minifb. Optional Python/Unicorn tools regenerate development fixtures.
 
 ## Layout
 
@@ -49,7 +60,7 @@ The output file must not already exist. This runs control calculations without p
 - [Gearbox, torque and RPM stages](docs/drivetrain.md)
 - [Complete speed/grip kernels and numerical foundations](docs/speed-grip-numerics.md)
 
-Next major work: the remaining `update_player_state` physics, terrain/contact planes, full replay world-state comparison, opponents, rendering, audio and device input.
+Next major work: remaining `update_player_state` physics, original terrain/contact planes, authentic track meshes and materials, full replay world-state comparison, opponents and audio. The experimental solver must not be treated as evidence that those original routines are ported.
 
 ## References
 

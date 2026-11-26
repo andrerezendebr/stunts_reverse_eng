@@ -86,6 +86,13 @@ impl<'a> Car<'a> {
         })
     }
 
+    /// Original wheel attachment vectors, before suspension displacement.
+    pub fn wheel_coordinates(&self) -> [[i16; 3]; 4] {
+        std::array::from_fn(|wheel| {
+            std::array::from_fn(|axis| self.signed_word(0xd2 + wheel * 6 + axis * 2))
+        })
+    }
+
     /// Raw shift-lever coordinates, including neutral at index zero.
     pub fn knob_point(&self, gear: u8) -> Result<(i16, i16), String> {
         if gear > self.gears() || gear > 6 {

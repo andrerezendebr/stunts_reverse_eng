@@ -10,8 +10,10 @@ public class MapMotion extends GhidraScript {
         if (!"2e2b514d183835267bdfd4ebeeb409b1c9facad78751ebaafeac54d93453e51b".equalsIgnoreCase(currentProgram.getExecutableSHA256()))
             throw new IllegalArgumentException("Unsupported executable SHA256");
         createLabel(toAddr("1471:07be"),"motion_preparation_end",true);
-        comment("1471:0692","Only entry through 1471:07BE is ported as motion::prepare: previous-position copy, speed scale, rotation preparation and pseudo-gravity. 512 original-code comparisons. Remaining suspension/contact/world integration is not ported.");
-        comment("1471:07be","Rust motion::prepare stops before this instruction. Remaining update_player_state includes skid rotation, wheel geometry, terrain/contact queries and world integration.");
+        createLabel(toAddr("1471:0a2e"),"wheel_prediction_end_contact_search_begin",true);
+        comment("1471:0692","Entry through 1471:07BE is ported as motion::prepare (512 original-code comparisons). Extended entry through 1471:0A2E is motion::predict_wheels (704 comparisons across eleven cars): upside-down adjustment, suspension attachment displacement, skid rotation and per-wheel travel. Terrain/contact search and final world integration remain unported. Native prototype physics is separate experimental code.");
+        comment("1471:07be","motion::prepare boundary; motion::predict_wheels continues through 1471:0A2E. Skid rotation uses mat_rot_zxy(0,0,-angle_z,0). planindex_copy=-1 for the initial four-wheel prediction.");
+        comment("1471:0a2e","Original wheel prediction validated in Rust: stack BP-448 predicted positions, BP-374 base positions, BP-240 upside-down adjustment. Stops before the contact retry loop. The experimental desktop solver does not reproduce the remaining original physics.");
         comment("24d6:149a","Pure result ported as matrix::rotation_zxy. 756 original-code comparisons check both composition orders and cached/skipped-axis cases. Oracle initializes the four predefined Y matrices using original mat_rot_y before running.");
         int[] addresses={0x60ce,0x572e,0x571c,0x5748};
         String[] names={"precomputed_y_rotation_0","precomputed_y_rotation_256","precomputed_y_rotation_512","precomputed_y_rotation_768"};
