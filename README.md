@@ -75,3 +75,7 @@ Next major work: remaining `update_player_state` physics, original terrain/conta
 - [ReStunts2](https://github.com/dstien/restunts2)
 
 The executables and resources in `stunts_dos/` belong to their respective rights holders. Their inclusion does not change ownership of these files.
+
+The GPU frontend includes animated procedural clouds, sun/moon, stars and morning haze. Sky colors and scene illumination follow the computer's local time (sampled at startup, then advanced in real time). Use `--time-of-day 6`, `12`, `18` or `0` to preview dawn, midday, dusk or night. This is a visual atmosphere cycle; it does not fetch live weather or change driving physics.
+
+GPU cars now use rounded 3D tires with tread grooves, alloy rims and five spokes, fitted to the original wheel records for all eleven models. Front wheels follow simulated steering; tire rotation follows actual horizontal travel and freezes with the simulation in menus. Restart resets wheel rotation. The LM002 spare remains fixed.

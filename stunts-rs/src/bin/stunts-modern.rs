@@ -26,6 +26,7 @@ struct Options {
     screenshot: Option<PathBuf>,
     report: Option<PathBuf>,
     smoke: bool,
+    time_of_day: Option<f32>,
 }
 impl Options {
     fn parse() -> Result<Self, String> {
@@ -36,6 +37,12 @@ impl Options {
                 .and_then(|i| args.get(i + 1))
                 .cloned()
         };
+        let time_of_day = value("--time-of-day")
+            .map(|s| s.parse::<f32>().map_err(|_| "Invalid hour".to_string()))
+            .transpose()?;
+        if time_of_day.is_some_and(|h| !h.is_finite() || !(0.0..24.0).contains(&h)) {
+            return Err("--time-of-day must be between 0 (inclusive) and 24 (exclusive)".into());
+        }
         Ok(Self {
             root: value("--data")
                 .map(PathBuf::from)
@@ -49,6 +56,7 @@ impl Options {
             screenshot: value("--screenshot").map(PathBuf::from),
             report: value("--report").map(PathBuf::from),
             smoke: args.iter().any(|a| a == "--smoke"),
+            time_of_day,
         })
     }
 }
@@ -353,6 +361,7 @@ impl eframe::App for App {
                         &race.world,
                         [(size.x * dpi) as u32, (size.y * dpi) as u32],
                         self.lighting,
+                        self.options.time_of_day,
                     );
                     let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
                     ui.painter().image(

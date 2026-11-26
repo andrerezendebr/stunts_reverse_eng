@@ -22,6 +22,8 @@ pub struct World {
     pub contacts: usize,
     pub collisions: u32,
     pub top_speed: u16,
+    /// Ground travel for visual wheel rotation; advances only with simulation.
+    pub wheel_travel: f32,
     vertical_speed: f32,
     spawn: [f32; 3],
     spawn_heading: f32,
@@ -50,6 +52,7 @@ impl World {
             contacts: 4,
             collisions: 0,
             top_speed: 0,
+            wheel_travel: 0.0,
             vertical_speed: 0.0,
             spawn,
             spawn_heading: heading,
@@ -59,6 +62,7 @@ impl World {
     pub fn reset(&mut self, car: &Car<'_>) -> Result<(), String> {
         self.state = simulation::initial_state(car, 1)?;
         self.position = self.spawn;
+        self.wheel_travel = 0.0;
         self.heading = self.spawn_heading;
         self.vertical_speed = 0.0;
         self.pitch = 0.0;
@@ -203,6 +207,8 @@ impl World {
             self.state.set_word(drivetrain::SPEED2, 0);
             self.state.set_word(drivetrain::SPEED, 0);
         }
+        self.wheel_travel += (self.position[0] - previous_position[0])
+            .hypot(self.position[2] - previous_position[2]);
         Ok(())
     }
 

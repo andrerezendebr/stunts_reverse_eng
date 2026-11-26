@@ -5,7 +5,7 @@ use eframe::{
     egui_wgpu::RenderState,
     wgpu::{self, util::DeviceExt},
 };
-use glam::{Mat4, Vec3};
+use glam::{Mat4, Quat, Vec3};
 use stunts_rs::{prototype::World, session::Session};
 
 #[repr(C)]
@@ -21,6 +21,8 @@ struct Uniforms {
     view_projection: [[f32; 4]; 4],
     model: [[f32; 4]; 4],
     lighting: [f32; 4],
+    inverse_view_projection: [[f32; 4]; 4],
+    atmosphere: [f32; 4],
 }
 struct Mesh {
     buffer: wgpu::Buffer,
@@ -30,12 +32,16 @@ struct Mesh {
 pub struct Gpu {
     state: RenderState,
     pipeline: wgpu::RenderPipeline,
+    sky_pipeline: wgpu::RenderPipeline,
+    clock: (f32, std::time::Instant),
     scene_uniform: wgpu::Buffer,
     car_uniform: wgpu::Buffer,
     scene_group: wgpu::BindGroup,
     car_group: wgpu::BindGroup,
     scene: Option<Mesh>,
     car: Option<Mesh>,
+    wheels: Option<Mesh>,
+    wheel_specs: Vec<Wheel>,
     color: wgpu::Texture,
     depth: wgpu::TextureView,
     size: [u32; 2],
@@ -128,6 +134,37 @@ impl Gpu {
             multiview: None,
             cache: None,
         });
+        let sky_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Time of day sky and clouds"),
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("sky_vertex"),
+                compilation_options: Default::default(),
+                buffers: &[],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: Some("sky_fragment"),
+                compilation_options: Default::default(),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: wgpu::TextureFormat::Rgba8Unorm,
+                    blend: None,
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            primitive: Default::default(),
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: wgpu::TextureFormat::Depth32Float,
+                depth_write_enabled: false,
+                depth_compare: wgpu::CompareFunction::Always,
+                stencil: Default::default(),
+                bias: Default::default(),
+            }),
+            multisample: Default::default(),
+            multiview: None,
+            cache: None,
+        });
         let (color, depth) = targets(device, [1, 1]);
         let texture = state.renderer.write().register_native_texture(
             device,
@@ -139,12 +176,16 @@ impl Gpu {
         Self {
             state,
             pipeline,
+            sky_pipeline,
+            clock: (local_seconds(), std::time::Instant::now()),
             scene_uniform,
             car_uniform,
             scene_group,
             car_group,
             scene: None,
             car: None,
+            wheels: None,
+            wheel_specs: Vec::new(),
             color,
             depth,
             size: [1, 1],
@@ -162,14 +203,25 @@ impl Gpu {
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     label: Some(label),
                     contents: bytemuck::cast_slice(vertices),
-                    usage: wgpu::BufferUsages::VERTEX,
+                    usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
                 }),
             count: vertices.len() as u32,
         };
         self.scene = Some(mesh(&scene, "Stunts static scene"));
         self.car = Some(mesh(&car, "Stunts local car"));
+        self.wheel_specs = wheels(session);
+        self.wheels = Some(mesh(
+            &wheel_vertices(&self.wheel_specs, &session.world),
+            "Animated tires and rims",
+        ));
     }
-    pub fn render(&mut self, world: &World, size: [u32; 2], lighting: bool) {
+    pub fn render(
+        &mut self,
+        world: &World,
+        size: [u32; 2],
+        lighting: bool,
+        time_of_day: Option<f32>,
+    ) {
         let size = size.map(|n| n.clamp(1, 4096));
         if size != self.size {
             let (color, depth) = targets(&self.state.device, size);
@@ -187,10 +239,17 @@ impl Gpu {
                 );
         }
         let (view_projection, model) = camera(world, size[0] as f32 / size[1] as f32);
+        let seconds = (self.clock.0 + self.clock.1.elapsed().as_secs_f32()).rem_euclid(86400.0);
+        let seconds = time_of_day
+            .map(|h| h * 3600.0 + self.clock.1.elapsed().as_secs_f32())
+            .unwrap_or(seconds)
+            .rem_euclid(86400.0);
         let uniforms = |model: Mat4| Uniforms {
             view_projection: view_projection.to_cols_array_2d(),
             model: model.to_cols_array_2d(),
             lighting: [u8::from(lighting) as f32, 0.0, 0.0, 0.0],
+            inverse_view_projection: view_projection.inverse().to_cols_array_2d(),
+            atmosphere: [seconds / 3600.0, seconds, 0.0, 0.0],
         };
         self.state.queue.write_buffer(
             &self.scene_uniform,
@@ -200,6 +259,13 @@ impl Gpu {
         self.state
             .queue
             .write_buffer(&self.car_uniform, 0, bytemuck::bytes_of(&uniforms(model)));
+        if let Some(mesh) = &self.wheels {
+            self.state.queue.write_buffer(
+                &mesh.buffer,
+                0,
+                bytemuck::cast_slice(&wheel_vertices(&self.wheel_specs, world)),
+            );
+        }
         let mut encoder =
             self.state
                 .device
@@ -235,10 +301,14 @@ impl Gpu {
                 occlusion_query_set: None,
                 timestamp_writes: None,
             });
+            pass.set_pipeline(&self.sky_pipeline);
+            pass.set_bind_group(0, &self.scene_group, &[]);
+            pass.draw(0..3, 0..1);
             pass.set_pipeline(&self.pipeline);
             for (mesh, group) in [
                 (&self.scene, &self.scene_group),
                 (&self.car, &self.car_group),
+                (&self.wheels, &self.car_group),
             ] {
                 if let Some(mesh) = mesh {
                     pass.set_bind_group(0, group, &[]);
@@ -351,12 +421,6 @@ fn car_vertices(session: &Session) -> Vec<Vertex> {
     ];
     for p in &session.shape.primitives {
         let v = |i: usize| points[p.indices[i] as usize];
-        if p.kind == 12 {
-            for q in [[0, 1, 2, 3], [3, 4, 5, 0]] {
-                triangle(&mut vertices, [v(q[0]), v(q[1]), v(q[2])], 0x20212a);
-                triangle(&mut vertices, [v(q[0]), v(q[2]), v(q[3])], 0x20212a);
-            }
-        }
         if (3..=10).contains(&p.kind) {
             let color = palette[p.materials.first().copied().unwrap_or(0) as usize % palette.len()];
             for i in 1..p.indices.len() - 1 {
@@ -366,9 +430,192 @@ fn car_vertices(session: &Session) -> Vec<Vertex> {
     }
     vertices
 }
+
+struct Wheel {
+    center: Vec3,
+    axis: Vec3,
+    radius: f32,
+    width: f32,
+    front: bool,
+    rolling: bool,
+}
+fn wheels(session: &Session) -> Vec<Wheel> {
+    session
+        .shape
+        .primitives
+        .iter()
+        .filter(|p| p.kind == 12)
+        .map(|p| {
+            let v = |i: usize| {
+                let v = session.shape.vertices[p.indices[i] as usize];
+                Vec3::new(-v[0] as f32, v[1] as f32, -v[2] as f32) * 0.0025
+            };
+            // Original type 12 stores each axle endpoint, radial-up point and radial-side point.
+            let a = v(0);
+            let b = v(3);
+            let center = (a + b) * 0.5;
+            let axis = (b - a).normalize();
+            Wheel {
+                center,
+                axis,
+                radius: (v(1) - a).length(),
+                width: (b - a).length(),
+                front: center.z < 0.0,
+                rolling: axis.x.abs() > 0.8,
+            }
+        })
+        .collect()
+}
+fn wheel_transform(wheel: &Wheel, world: &World) -> Mat4 {
+    let steer = world.state.word(stunts_rs::grip::STEERING) as i16 as f32 / 240.0 * 0.48;
+    // Use a consistent positive-X axle so both sides roll in the same direction.
+    let axis = if wheel.axis.x < 0.0 {
+        -wheel.axis
+    } else {
+        wheel.axis
+    };
+    let turn = if wheel.front && wheel.rolling {
+        -steer
+    } else {
+        0.0
+    };
+    let spin = if wheel.rolling {
+        -world.wheel_travel / wheel.radius
+    } else {
+        0.0
+    };
+    Mat4::from_translation(wheel.center)
+        * Mat4::from_rotation_y(turn)
+        * Mat4::from_quat(Quat::from_rotation_arc(Vec3::X, axis))
+        * Mat4::from_rotation_x(spin)
+}
+fn wheel_vertices(wheels: &[Wheel], world: &World) -> Vec<Vertex> {
+    let mut vertices = Vec::new();
+    for wheel in wheels {
+        let transform = wheel_transform(wheel, world);
+        let r = wheel.radius;
+        let w = wheel.width;
+        let point = |x: f32, radius: f32, angle: f32| {
+            transform
+                .transform_point3(Vec3::new(x, radius * angle.cos(), radius * angle.sin()))
+                .to_array()
+        };
+        // Rounded shoulders, sidewalls and recessed circumferential tread grooves.
+        let rings: [(f32, f32); 14] = [
+            (-0.5, 0.57),
+            (-0.5, 0.84),
+            (-0.43, 0.96),
+            (-0.32, 1.0),
+            (-0.16, 1.0),
+            (-0.12, 0.98),
+            (-0.08, 1.0),
+            (0.08, 1.0),
+            (0.12, 0.98),
+            (0.16, 1.0),
+            (0.32, 1.0),
+            (0.43, 0.96),
+            (0.5, 0.84),
+            (0.5, 0.57),
+        ];
+        for i in 0..40 {
+            let a = i as f32 * std::f32::consts::TAU / 40.0;
+            let b = (i + 1) as f32 * std::f32::consts::TAU / 40.0;
+            for band in rings.windows(2) {
+                let [(x0, r0), (x1, r1)] = [band[0], band[1]];
+                let tread = x0.abs() < 0.33 && x1.abs() < 0.33;
+                let color = if tread && (i % 5 == 0 || r0 < 0.99 || r1 < 0.99) {
+                    0x151619
+                } else if tread {
+                    0x303136
+                } else {
+                    0x222327
+                };
+                let q = [
+                    point(x0 * w, r0 * r, a),
+                    point(x1 * w, r1 * r, a),
+                    point(x1 * w, r1 * r, b),
+                    point(x0 * w, r0 * r, b),
+                ];
+                triangle(&mut vertices, [q[0], q[1], q[2]], color);
+                triangle(&mut vertices, [q[0], q[2], q[3]], color);
+            }
+            for side in [-1.0, 1.0] {
+                let x = side * w * 0.505;
+                // Five alloy spokes over a dark brake recess; bright rim lip and central hub.
+                for (inner, outer, color) in [
+                    (0.52, 0.57, 0xb4bac3),
+                    (0.17, 0.52, if i % 8 < 2 { 0xa3abb7 } else { 0x343840 }),
+                    (0.0, 0.17, 0x737c8b),
+                ] {
+                    let q = [
+                        point(x, inner * r, a),
+                        point(x, outer * r, a),
+                        point(x, outer * r, b),
+                        point(x, inner * r, b),
+                    ];
+                    triangle(&mut vertices, [q[0], q[1], q[2]], color);
+                    triangle(&mut vertices, [q[0], q[2], q[3]], color);
+                }
+            }
+        }
+    }
+    vertices
+}
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn tires_fit_all_cars_and_follow_simulated_travel_and_steering() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../stunts_dos");
+        let catalog = stunts_rs::frontend::Catalog::load(&root).unwrap();
+        for i in 0..catalog.cars.len() {
+            let mut session = Session::load(&root, &catalog, 0, i).unwrap();
+            let specs = wheels(&session);
+            assert_eq!(specs.iter().filter(|w| w.rolling).count(), 4);
+            assert_eq!(specs.iter().filter(|w| w.rolling && w.front).count(), 2);
+            let vertices = wheel_vertices(&specs, &session.world);
+            assert!(vertices.len() > 10000);
+            assert!(vertices.iter().all(|v| v
+                .position
+                .iter()
+                .chain(&v.normal)
+                .all(|x| x.is_finite())));
+            let front = specs.iter().find(|w| w.front && w.rolling).unwrap();
+            let rear = specs.iter().find(|w| !w.front && w.rolling).unwrap();
+            let initial = wheel_transform(front, &session.world);
+            session.world.wheel_travel = front.radius;
+            let moved = wheel_transform(front, &session.world);
+            assert!(
+                (initial.transform_vector3(Vec3::Y) - moved.transform_vector3(Vec3::Y)).length()
+                    > 0.5
+            );
+            let rear_before = wheel_transform(rear, &session.world);
+            session.world.state.set_word(stunts_rs::grip::STEERING, 120);
+            let turned = wheel_transform(front, &session.world);
+            assert!(
+                (turned.transform_vector3(Vec3::X) - moved.transform_vector3(Vec3::X)).length()
+                    > 0.1
+            );
+            assert_eq!(rear_before, wheel_transform(rear, &session.world));
+            assert!((turned.transform_point3(Vec3::ZERO) - front.center).length() < 0.0001);
+            session.reset().unwrap();
+            assert_eq!(session.world.wheel_travel, 0.0);
+            assert_eq!(initial, wheel_transform(front, &session.world));
+            if i == 0 {
+                let mut distance = 0.0;
+                for _ in 0..40 {
+                    let before = session.world.position;
+                    session.tick(1).unwrap();
+                    distance += (session.world.position[0] - before[0])
+                        .hypot(session.world.position[2] - before[2]);
+                }
+                assert!(distance > 0.0);
+                assert!((session.world.wheel_travel - distance).abs() < 0.0001);
+                session.reset().unwrap();
+                assert_eq!(session.world.wheel_travel, 0.0);
+            }
+        }
+    }
     #[test]
     fn original_meshes_upload_as_finite_triangles_and_camera_follows_heading() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../stunts_dos");
@@ -390,4 +637,54 @@ mod tests {
             assert!(model.is_finite());
         }
     }
+}
+
+// Anchor the animation to the computer's local civil clock.
+#[cfg(windows)]
+fn local_seconds() -> f32 {
+    #[repr(C)]
+    #[derive(Default)]
+    struct SystemTime {
+        year: u16,
+        month: u16,
+        weekday: u16,
+        day: u16,
+        hour: u16,
+        minute: u16,
+        second: u16,
+        millis: u16,
+    }
+    #[link(name = "kernel32")]
+    extern "system" {
+        fn GetLocalTime(time: *mut SystemTime);
+    }
+    let mut time = SystemTime::default();
+    // The OS writes one SYSTEMTIME to this valid, correctly sized pointer.
+    unsafe {
+        GetLocalTime(&mut time);
+    }
+    time.hour as f32 * 3600.0 + time.minute as f32 * 60.0 + time.second as f32
+}
+#[cfg(not(windows))]
+fn local_seconds() -> f32 {
+    let local = std::process::Command::new("date")
+        .arg("+%H %M %S")
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .and_then(|o| String::from_utf8(o.stdout).ok());
+    if let Some(local) = local {
+        let parts: Vec<f32> = local
+            .split_whitespace()
+            .filter_map(|s| s.parse().ok())
+            .collect();
+        if parts.len() == 3 {
+            return parts[0] * 3600.0 + parts[1] * 60.0 + parts[2];
+        }
+    }
+    (std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+        % 86400) as f32
 }
