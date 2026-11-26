@@ -19,6 +19,14 @@ from the original resources. The menu shows the selected track's layout and car
 name. Start Race loads the selected car's parameters and `car0` mesh, and the
 selected track's scene. A failed race load leaves the menu open with an error.
 
+Mouse navigation works in the main, pause and controls menus: hovering selects
+an option, and a left click activates it. Track/car arrow buttons select the
+previous or next entry; clicking the label advances to the next entry. Each
+press activates once, even when held. A stationary pointer does not undo keyboard
+selection. Unscaled client coordinates are mapped to the stretched framebuffer,
+keeping hit regions aligned after resizing. The on-screen pause button also
+opens the pause menu with the mouse.
+
 W/Up accelerates, S/Down brakes, A/Left and D/Right steer, R resets the car, and
 Escape opens the pause menu. Resume preserves the race; Restart resets it;
 Main Menu permits another selection; Exit closes the application. Physics and

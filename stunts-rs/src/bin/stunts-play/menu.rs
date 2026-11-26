@@ -86,6 +86,7 @@ pub enum Action {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Command {
     None,
+    Pause,
     Start,
     Resume,
     Restart,
@@ -99,6 +100,8 @@ pub struct Menu {
     pub error: Option<String>,
     tracks: usize,
     cars: usize,
+    pointer_position: Option<(f32, f32)>,
+    pointer_down: bool,
 }
 impl Menu {
     pub fn new(tracks: usize, cars: usize, track: usize, car: usize) -> Self {
@@ -111,6 +114,8 @@ impl Menu {
             error: None,
             tracks,
             cars,
+            pointer_position: None,
+            pointer_down: false,
         }
     }
     pub fn pause(&mut self) {
@@ -125,6 +130,52 @@ impl Menu {
             Screen::Controls => 1,
             Screen::Racing => 0,
         }
+    }
+    /// Window input is normalized to framebuffer coordinates before hit testing.
+    /// React to a press edge, never every frame while the button is held. Only
+    /// mouse movement changes hover selection, preserving keyboard navigation.
+    pub fn pointer(&mut self, position: Option<(f32, f32)>, down: bool) -> Command {
+        let clicked = down && !self.pointer_down;
+        let moved = position != self.pointer_position;
+        self.pointer_down = down;
+        self.pointer_position = position;
+        let Some((x, y)) = position else {
+            return Command::None;
+        };
+        if !x.is_finite() || !y.is_finite() {
+            return Command::None;
+        }
+        if self.screen == Screen::Racing {
+            return if clicked && (12.0..156.0).contains(&x) && (542.0..580.0).contains(&y) {
+                Command::Pause
+            } else {
+                Command::None
+            };
+        }
+        if !moved && !clicked {
+            return Command::None;
+        }
+        if !(48.0..434.0).contains(&x) {
+            return Command::None;
+        }
+        for row in 0..self.rows() {
+            let top = 198.0 + row as f32 * 55.0;
+            if (top..top + 44.0).contains(&y) {
+                self.row = row;
+                if clicked {
+                    if self.screen == Screen::Main && (row == 1 || row == 2) && x >= 368.0 {
+                        return self.act(if x < 400.0 {
+                            Action::Left
+                        } else {
+                            Action::Right
+                        });
+                    }
+                    return self.act(Action::Confirm);
+                }
+                break;
+            }
+        }
+        Command::None
     }
     /// Navigation only requests race actions. The caller commits a new race
     /// after all selected files load successfully, so errors stay in the menu.
@@ -227,6 +278,8 @@ impl Menu {
                 if i == self.row { 0xffffff } else { 0xa4b4c6 },
             );
             if self.screen == Screen::Main && (i == 1 || i == 2) {
+                rect(pixels, width, 368, y - 7, 30, 30, 0x203348);
+                rect(pixels, width, 400, y - 7, 30, 30, 0x203348);
                 text(pixels, width, 380, y, "< >", 2, 0xf4c34e);
             }
         }
@@ -328,12 +381,34 @@ impl Menu {
             width,
             55,
             height - 25,
-            "UP/DOWN SELECT   LEFT/RIGHT CHANGE   ENTER CONFIRM   ESC BACK",
+            "MOUSE: POINT AND CLICK   ARROWS: SELECT/CHANGE   ENTER: CONFIRM",
             2,
             0x93a8be,
         );
     }
 }
+/// Match pointer coordinates to the stretched framebuffer after window resize.
+pub fn framebuffer_pointer(
+    position: Option<(f32, f32)>,
+    window: (usize, usize),
+    buffer: (usize, usize),
+) -> Option<(f32, f32)> {
+    let (x, y) = position?;
+    if window.0 == 0
+        || window.1 == 0
+        || x < 0.0
+        || y < 0.0
+        || x >= window.0 as f32
+        || y >= window.1 as f32
+    {
+        return None;
+    }
+    Some((
+        x * buffer.0 as f32 / window.0 as f32,
+        y * buffer.1 as f32 / window.1 as f32,
+    ))
+}
+
 fn cycle(index: usize, len: usize, backwards: bool) -> usize {
     if backwards {
         (index + len - 1) % len
@@ -342,7 +417,15 @@ fn cycle(index: usize, len: usize, backwards: bool) -> usize {
     }
 }
 
-fn rect(pixels: &mut [u32], width: usize, x: usize, y: usize, w: usize, h: usize, color: u32) {
+pub(super) fn rect(
+    pixels: &mut [u32],
+    width: usize,
+    x: usize,
+    y: usize,
+    w: usize,
+    h: usize,
+    color: u32,
+) {
     let height = pixels.len() / width;
     for row in y.min(height)..y.saturating_add(h).min(height) {
         let start = x.min(width);
@@ -437,6 +520,71 @@ fn glyph(c: char) -> [u8; 7] {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn mouse_clicks_navigate_once_and_do_not_override_keyboard_when_stationary() {
+        let mut menu = Menu::new(41, 11, 0, 0);
+        assert_eq!(menu.pointer(Some((100.0, 270.0)), false), Command::None);
+        assert_eq!(menu.row, 1);
+        menu.pointer(Some((380.0, 270.0)), true);
+        assert_eq!(menu.track, 40);
+        menu.pointer(Some((380.0, 270.0)), true);
+        assert_eq!(menu.track, 40);
+        menu.pointer(Some((410.0, 270.0)), false);
+        menu.pointer(Some((410.0, 270.0)), true);
+        assert_eq!(menu.track, 0);
+        menu.pointer(Some((410.0, 270.0)), false);
+        menu.act(Action::Down);
+        assert_eq!(menu.row, 2);
+        menu.pointer(Some((410.0, 270.0)), false);
+        assert_eq!(menu.row, 2);
+        menu.pointer(Some((380.0, 325.0)), true);
+        assert_eq!(menu.car, 10);
+        menu.pointer(None, false);
+        assert_eq!(menu.pointer(Some((100.0, 220.0)), true), Command::Start);
+        assert_eq!(menu.pointer(Some((100.0, 220.0)), true), Command::None);
+        menu.pointer(None, false);
+        menu.screen = Screen::Racing;
+        assert_eq!(menu.pointer(Some((70.0, 560.0)), true), Command::Pause);
+        menu.pause();
+        menu.pointer(None, false);
+        assert_eq!(menu.pointer(Some((100.0, 220.0)), true), Command::Resume);
+        menu.pointer(None, false);
+        assert_eq!(menu.pointer(Some((100.0, 275.0)), true), Command::Restart);
+        menu.pointer(None, false);
+        menu.pointer(Some((100.0, 330.0)), true);
+        assert_eq!(menu.screen, Screen::Main);
+        menu.pointer(None, false);
+        menu.pointer(Some((100.0, 385.0)), true);
+        assert_eq!(menu.screen, Screen::Controls);
+        menu.pointer(None, false);
+        menu.pointer(Some((100.0, 220.0)), true);
+        assert_eq!(menu.screen, Screen::Main);
+        menu.pointer(None, false);
+        assert_eq!(menu.pointer(Some((100.0, 440.0)), true), Command::Quit);
+    }
+    #[test]
+    fn mouse_coordinates_follow_window_resize_and_ignore_non_buttons() {
+        let position = framebuffer_pointer(Some((200.0, 550.0)), (1920, 1200), (960, 600));
+        assert_eq!(position, Some((100.0, 275.0)));
+        let mut menu = Menu::new(41, 11, 0, 0);
+        menu.pointer(position, true);
+        assert_eq!(menu.track, 1);
+        menu.pointer(None, false);
+        assert_eq!(menu.pointer(Some((100.0, 245.0)), true), Command::None);
+        assert_eq!(menu.track, 1);
+        assert_eq!(
+            framebuffer_pointer(Some((1.0, 1.0)), (0, 0), (960, 600)),
+            None
+        );
+        assert_eq!(
+            framebuffer_pointer(Some((-1.0, 1.0)), (960, 600), (960, 600)),
+            None
+        );
+        assert_eq!(
+            framebuffer_pointer(Some((960.0, 1.0)), (960, 600), (960, 600)),
+            None
+        );
+    }
     #[test]
     fn selection_wraps_and_race_actions_do_not_commit_until_load_succeeds() {
         let mut menu = Menu::new(41, 11, 0, 0);

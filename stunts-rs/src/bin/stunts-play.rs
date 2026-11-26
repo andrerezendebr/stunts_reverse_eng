@@ -1,5 +1,5 @@
 //! Native software-rendered driving experiment, separate from verified DOS physics.
-use minifb::{Key, KeyRepeat, Window, WindowOptions};
+use minifb::{Key, KeyRepeat, MouseButton, MouseMode, Window, WindowOptions};
 #[path = "stunts-play/menu.rs"]
 mod menu;
 use menu::{Action, Catalog, Command, Menu, Screen};
@@ -286,6 +286,7 @@ impl Race {
             2,
             0xffffff,
         );
+        menu::rect(&mut renderer.pixels, W, 12, H - 58, 144, 38, 0x18283c);
         menu::text(
             &mut renderer.pixels,
             W,
@@ -396,53 +397,64 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             if !w.is_open() {
                 break;
             }
-            if menu.screen == Screen::Racing {
-                if w.is_key_pressed(Key::Escape, KeyRepeat::No) {
-                    menu.pause();
-                }
-                if w.is_key_down(Key::Up) || w.is_key_down(Key::W) {
-                    input |= 1;
-                }
-                if w.is_key_down(Key::Down) || w.is_key_down(Key::S) {
-                    input |= 2;
-                }
-                if w.is_key_down(Key::Left) || w.is_key_down(Key::A) {
-                    input |= 8;
-                }
-                if w.is_key_down(Key::Right) || w.is_key_down(Key::D) {
-                    input |= 4;
-                }
-                if w.is_key_pressed(Key::R, KeyRepeat::No) {
-                    if let Some(race) = race.as_mut() {
-                        race.reset()?;
+            command = menu.pointer(
+                menu::framebuffer_pointer(
+                    w.get_unscaled_mouse_pos(MouseMode::Discard),
+                    w.get_size(),
+                    (W, H),
+                ),
+                w.get_mouse_down(MouseButton::Left),
+            );
+            if command == Command::None {
+                if menu.screen == Screen::Racing {
+                    if w.is_key_pressed(Key::Escape, KeyRepeat::No) {
+                        menu.pause();
                     }
-                }
-            } else {
-                for (key, action) in [
-                    (Key::Up, Action::Up),
-                    (Key::Down, Action::Down),
-                    (Key::Left, Action::Left),
-                    (Key::Right, Action::Right),
-                    (Key::Enter, Action::Confirm),
-                    (Key::Escape, Action::Back),
-                ] {
-                    if w.is_key_pressed(
-                        key,
-                        if matches!(action, Action::Confirm | Action::Back) {
-                            KeyRepeat::No
-                        } else {
-                            KeyRepeat::Yes
-                        },
-                    ) {
-                        command = menu.act(action);
-                        if command != Command::None {
-                            break;
+                    if w.is_key_down(Key::Up) || w.is_key_down(Key::W) {
+                        input |= 1;
+                    }
+                    if w.is_key_down(Key::Down) || w.is_key_down(Key::S) {
+                        input |= 2;
+                    }
+                    if w.is_key_down(Key::Left) || w.is_key_down(Key::A) {
+                        input |= 8;
+                    }
+                    if w.is_key_down(Key::Right) || w.is_key_down(Key::D) {
+                        input |= 4;
+                    }
+                    if w.is_key_pressed(Key::R, KeyRepeat::No) {
+                        if let Some(race) = race.as_mut() {
+                            race.reset()?;
+                        }
+                    }
+                } else {
+                    for (key, action) in [
+                        (Key::Up, Action::Up),
+                        (Key::Down, Action::Down),
+                        (Key::Left, Action::Left),
+                        (Key::Right, Action::Right),
+                        (Key::Enter, Action::Confirm),
+                        (Key::Escape, Action::Back),
+                    ] {
+                        if w.is_key_pressed(
+                            key,
+                            if matches!(action, Action::Confirm | Action::Back) {
+                                KeyRepeat::No
+                            } else {
+                                KeyRepeat::Yes
+                            },
+                        ) {
+                            command = menu.act(action);
+                            if command != Command::None {
+                                break;
+                            }
                         }
                     }
                 }
             }
         }
         match command {
+            Command::Pause => menu.pause(),
             Command::Quit => break,
             Command::Start => match Race::load(&root, &catalog, &menu) {
                 Ok(next) => {
