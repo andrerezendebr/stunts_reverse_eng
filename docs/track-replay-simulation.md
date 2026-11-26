@@ -118,8 +118,8 @@ To reproduce the Ghidra names and targeted exports on the reconstructed project:
 analyzeHeadless reverse/projects Stunts -process MCGA.exe -noanalysis -scriptPath tools/ghidra -postScript TraceSimulation.java reverse/exports/simulation -postScript ExportAnalysis.java reverse/exports
 ```
 
-The suite currently has 14 passing tests, including the 41 original tracks, the replay layout, the 79 compressed resources, all 256 control-byte decompositions, malformed inputs, and the arithmetic checks above.
+This milestone had 14 passing tests, including the 41 original tracks, the replay layout, the 79 compressed resources, all 256 control-byte decompositions, malformed inputs, and the arithmetic checks above.
 
 ## Remaining work
 
-The next milestone now maps [steering-response tables and car simulation resources](steering-car-parameters.md), with steering and aero-table ports validated against original CPU execution. Full engine, suspension, collisions, opponent behavior, rendering, sound, and frame-by-frame replay state comparison remain unimplemented.
+The next milestone now maps [steering-response tables and car simulation resources](steering-car-parameters.md), with steering and aero-table ports validated against original CPU execution. Complete speed and grip have since been ported; full world physics, suspension, collisions, opponent behavior, rendering, sound and complete replay world-state comparison remain unimplemented.

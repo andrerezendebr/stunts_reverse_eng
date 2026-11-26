@@ -66,6 +66,15 @@ impl<'a> Car<'a> {
         self.signed_word(0xb4)
     }
 
+    /// Original grip lookup starts at the sliding word, then indexes by surface.
+    /// Code 5 (water) reaches the following word, retained raw rather than renamed.
+    pub fn surface_factor(&self, surface: u8) -> Result<i16, String> {
+        if surface > 5 {
+            return Err("Unknown wheel surface code".into());
+        }
+        Ok(self.signed_word(0xb4 + usize::from(surface) * 2))
+    }
+
     /// Ratios retain their unsigned on-disk representation; index zero is included.
     pub fn gear_ratios(&self) -> [u16; 7] {
         std::array::from_fn(|index| {

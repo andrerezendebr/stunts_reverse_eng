@@ -36,7 +36,19 @@ public class TraceSimulation extends GhidraScript {
             {"1471:40a2", "update_steering", "558bec83ec0657568b3e968ea1a28eb10ad3e824fc8846fc988b"},
             {"1471:5592", "setup_aero_trackdata", "558bec83ec025756837e0a007403e98300"},
             {"274b:15dc", "locate_shape_alt", "558becff760aff7608ff7606"},
-            {"19dc:0006", "update_rpm_from_speed", "558bec558b4e068b4608837e0c007505f7660a8bca3b4e0e73038b4e0e8bc15d5dcb"}
+            {"19dc:0006", "update_rpm_from_speed", "558bec558b4e068b4608837e0c007505f7660a8bca3b4e0e73038b4e0e8bc15d5dcb"},
+            {"1471:38c6", "update_grip", "558bec83ec1057568b5e0680bfc100007514c7474000008b"},
+            {"2ea2:3cbe", "sin_fast", "558bec8b46068adc32e483e303d1e3"},
+            {"2ea2:3d0c", "cos_fast", "558bec8b4606050001ebad"},
+            {"2ea2:3ece", "mat_mul_vector", "558bec56578b5e088b76068b7e0a33d28b070bc074108b0c"},
+            {"2ea2:3fd2", "mat_multiply", "558bec56578b76068b5e088b7e0ab9090033d28b040bc074"},
+            {"2ea2:4052", "mat_transpose", "558bec56578b76068b7e08b909003bf7751f8b4402874406"},
+            {"36f2:000a", "mat_rot_x", "558bec83ec04ff7608"},
+            {"36f2:0060", "mat_rot_y", "558bec83ec04ff7608"},
+            {"36f2:00b8", "mat_rot_z", "558bec83ec04ff7608"},
+            {"19dc:00bb", "get_kevinrandom", "a0dfa10206dea1a2dea10206dda1a2dda10206dca1a2dca1"},
+            {"1471:0692", "update_player_state", "558bec81ece40157568b5e068b078b5702a34e928916509289470c89570e8b5e"},
+            {"24d6:149a", "mat_rot_zxy", "558bec83ec0457562bf6"}
         };
         // Guard both the file version and each instruction prefix before renaming.
         // Prefixes stop before relocated segment words, which Ghidra adjusts.
@@ -50,7 +62,7 @@ public class TraceSimulation extends GhidraScript {
             if (function == null) throw new IllegalStateException("Missing function at " + address);
             function.setName(target[1], SourceType.USER_DEFINED);
             currentProgram.getListing().setComment(address, CodeUnit.PLATE_COMMENT,
-                "Name matched to ReStunts reference disassembly; exact instruction prefix checked. See docs/track-replay-simulation.md for scope and verification.");
+                "Name matched to ReStunts reference disassembly; exact instruction prefix checked. See docs/speed-grip-numerics.md and earlier mapping notes for scope and verification.");
         }
         // The leaf arithmetic routine reads two signed words at BP+6 and BP+8.
         // Fix its verified signature so callers no longer inherit guessed arity.

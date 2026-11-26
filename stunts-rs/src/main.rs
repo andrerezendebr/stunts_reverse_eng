@@ -2,15 +2,10 @@
 //! Decoding and executable assembly live in separate modules so the CLI only
 //! handles arguments, file access, and human-readable output.
 use std::{env, error::Error, fs, io::Write, path::Path, process};
-mod car;
-mod compression;
-mod drivetrain;
-mod executable;
-mod fixed;
-mod replay;
-mod resource;
-mod steering;
-mod track;
+use stunts_rs::{
+    car, compression, drivetrain, executable, fixed, grip, replay, resource, simulation, steering,
+    track,
+};
 
 /// DOS strings may contain stale bytes after NUL and non-ASCII identifiers.
 /// Render the meaningful prefix while escaping any bytes unsafe for a terminal.
@@ -94,6 +89,22 @@ fn run() -> Result<(), Box<dyn Error>> {
             }
         }
         Some("inspect") if args.len() == 2 => inspect(Path::new(&args[1]))?,
+        Some("control-trace") if args.len() == 5 => {
+            let bytes=fs::read(&args[1])?;let car=car::Car::parse(&bytes)?;
+            let fps:u16=args[2].to_str().ok_or("Invalid FPS")?.parse()?;
+            let frames:usize=args[3].to_str().ok_or("Invalid frame count")?.parse()?;
+            if fps==0 || frames>1_000_000 {return Err("Use nonzero FPS and at most 1000000 frames".into());}
+            let mut state=simulation::initial_state(&car,1)?;let mut top=0;
+            let mut output=std::io::BufWriter::new(fs::OpenOptions::new().write(true).create_new(true).open(&args[4])?);
+            writeln!(output,"frame,input,speed_raw,speed2_raw,rpm,gear,changing,steering_raw,slip_raw,top_speed_raw")?;
+            for frame in 0..frames {
+                let input=simulation::scenario_input(frame);
+                simulation::control_tick(&mut state,&car,input,fps,&[0;900],&mut top)?;
+                writeln!(output,"{frame},{input},{},{},{},{},{},{},{},{top}",state.word(drivetrain::SPEED),state.word(drivetrain::SPEED2),state.word(drivetrain::RPM),state.0[drivetrain::GEAR],state.0[drivetrain::CHANGING],state.word(grip::STEERING) as i16,state.word(grip::SLIP) as i16)?;
+            }
+            output.flush()?;
+            println!("Exported {frames} native Rust control-kernel frames. Position, suspension and collisions were not integrated.");
+        }
         Some("rpm") if args.len() == 6 => {
             let values = args[1..].iter().map(|s| s.to_str().ok_or("Invalid integer")?.parse::<u16>().map_err(|_| "Invalid u16 integer")).collect::<Result<Vec<_>,_>>()?;
             println!("{}", drivetrain::rpm_from_speed(values[0], values[1], values[2], values[3], values[4]));
@@ -211,7 +222,7 @@ fn run() -> Result<(), Box<dyn Error>> {
                 .write_all(&output)?;
             println!("Combined {mode} packed executable: {} bytes (EXEPACK unpacking still required)", output.len());
         }
-        _ => return Err("Usage: stunts-rs rpm <current> <speed> <ratio> <changing> <idle> | torque <car-res> <gear> <rpm> <limiter> | gear-tick <car-res> <gear> <rpm> <input> <fps> | inventory <directory> | inspect <file> | resources <uncompressed-archive> | car <car-res> | steer <angle-i16> <speed-u16> <input-code> <fps> | track <trk> | replay <rpl> | replay-inputs <rpl> <new-csv> | fixed-mul <i16> <i16> | decompress <input> <new-output> | combine <game-directory> <video-mode> <new-output>".into()),
+        _ => return Err("Usage: stunts-rs control-trace <car-res> <fps> <frames> <new-csv> | rpm <current> <speed> <ratio> <changing> <idle> | torque <car-res> <gear> <rpm> <limiter> | gear-tick <car-res> <gear> <rpm> <input> <fps> | inventory <directory> | inspect <file> | resources <uncompressed-archive> | car <car-res> | steer <angle-i16> <speed-u16> <input-code> <fps> | track <trk> | replay <rpl> | replay-inputs <rpl> <new-csv> | fixed-mul <i16> <i16> | decompress <input> <new-output> | combine <game-directory> <video-mode> <new-output>".into()),
     }
     Ok(())
 }

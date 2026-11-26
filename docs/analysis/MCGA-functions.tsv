@@ -19,7 +19,7 @@ address	name	body_bytes
 1000:46e4	FUN_1000_46e4	46
 1471:0002	FUN_1471_0002	1611
 1471:065c	FUN_1471_065c	54
-1471:0692	FUN_1471_0692	6884
+1471:0692	update_player_state	6884
 1471:2188	FUN_1471_2188	617
 1471:23f2	FUN_1471_23f2	1080
 1471:282a	FUN_1471_282a	203
@@ -27,7 +27,7 @@ address	name	body_bytes
 1471:2ad8	player_op	1573
 1471:3106	FUN_1471_3106	602
 1471:3368	update_car_speed	1359
-1471:38c6	FUN_1471_38c6	1157
+1471:38c6	update_grip	1157
 1471:3d56	FUN_1471_3d56	397
 1471:3ee6	FUN_1471_3ee6	442
 1471:40a2	update_steering	240
@@ -52,7 +52,7 @@ address	name	body_bytes
 19dc:0053	FUN_19dc_0053	14
 19dc:0061	FUN_19dc_0061	45
 19dc:008e	FUN_19dc_008e	45
-19dc:00bb	FUN_19dc_00bb	78
+19dc:00bb	get_kevinrandom	78
 19dc:0128	init_div0	31
 19f1:0004	FUN_19f1_0004	385
 19f1:0186	FUN_19f1_0186	94
@@ -106,7 +106,7 @@ address	name	body_bytes
 24d6:1182	FUN_24d6_1182	75
 24d6:11ce	FUN_24d6_11ce	197
 24d6:1296	FUN_24d6_1296	510
-24d6:149a	FUN_24d6_149a	220
+24d6:149a	mat_rot_zxy	220
 24d6:161a	FUN_24d6_161a	76
 24d6:1666	FUN_24d6_1666	312
 24d6:17a0	FUN_24d6_17a0	81
@@ -375,8 +375,8 @@ address	name	body_bytes
 2ea2:3c2a	FUN_2ea2_3c2a	17
 2ea2:3c3b	FUN_2ea2_3c3b	95
 2ea2:3c9a	FUN_2ea2_3c9a	36
-2ea2:3cbe	FUN_2ea2_3cbe	53
-2ea2:3d0c	FUN_2ea2_3d0c	11
+2ea2:3cbe	sin_fast	53
+2ea2:3d0c	cos_fast	11
 2ea2:3d26	FUN_2ea2_3d26	11
 2ea2:3d31	FUN_2ea2_3d31	11
 2ea2:3d3c	FUN_2ea2_3d3c	14
@@ -390,9 +390,9 @@ address	name	body_bytes
 2ea2:3e12	FUN_2ea2_3e12	16
 2ea2:3e23	FUN_2ea2_3e23	67
 2ea2:3e66	FUN_2ea2_3e66	51
-2ea2:3ece	FUN_2ea2_3ece	260
-2ea2:3fd2	FUN_2ea2_3fd2	128
-2ea2:4052	FUN_2ea2_4052	105
+2ea2:3ece	mat_mul_vector	260
+2ea2:3fd2	mat_multiply	128
+2ea2:4052	mat_transpose	105
 2ea2:40c2	FUN_2ea2_40c2	196
 2ea2:45dc	FUN_2ea2_45dc	9
 2ea2:45f4	FUN_2ea2_45f4	85
@@ -477,9 +477,9 @@ address	name	body_bytes
 36be:0008	FUN_36be_0008	148
 36c7:000e	FUN_36c7_000e	576
 36ec:0000	FUN_36ec_0000	105
-36f2:000a	FUN_36f2_000a	85
-36f2:0060	FUN_36f2_0060	88
-36f2:00b8	FUN_36f2_00b8	85
+36f2:000a	mat_rot_x	85
+36f2:0060	mat_rot_y	88
+36f2:00b8	mat_rot_z	85
 3702:000e	FUN_3702_000e	140
 370b:000a	FUN_370b_000a	24
 370d:0002	FUN_370d_0002	170

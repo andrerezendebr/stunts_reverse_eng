@@ -3,6 +3,8 @@
 
 # Rust build output and local settings
 **/target/
+**/__pycache__/
+*.py[cod]
 .env
 .env.*
 .idea/

@@ -138,8 +138,8 @@ To reproduce the Ghidra map:
 analyzeHeadless reverse/projects Stunts -process MCGA.exe -noanalysis -scriptPath tools/ghidra -postScript MapCarData.java reverse/exports/simulation -postScript TraceSimulation.java reverse/exports/simulation -postScript ExportAnalysis.java reverse/exports
 ```
 
-There are now 21 passing Rust tests. No Python or Unicorn dependency is needed to run them because they consume the committed fixtures.
+This milestone had 21 passing Rust tests; see speed-grip-numerics.md for the current suite. No Python or Unicorn dependency is needed to run them because they consume the committed fixtures.
 
 ## Next mapping targets
 
-Torque lookup, gearbox stages, and the RPM helper are now covered by [drivetrain mapping](drivetrain.md). Full speed integration, engine braking behavior, and conversion from speed and steering to wheel forces still need validation and porting. These routines do not yet form a runnable car simulation or reproduce an entire replay.
+Torque lookup, gearbox stages, and the RPM helper are now covered by [drivetrain mapping](drivetrain.md). Complete speed integration and grip are now validated in [speed/grip kernels](speed-grip-numerics.md); the remaining wheel/suspension and world integration still need porting. These routines do not yet form a runnable car simulation or reproduce an entire replay.

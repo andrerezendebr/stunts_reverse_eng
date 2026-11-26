@@ -1,49 +1,55 @@
-# Stunts in Rust
+# Stunts reverse engineering in Rust
 
-An early-stage reimplementation of Stunts for DOS in Rust, using Ghidra to study the original routines.
+A partial native port of the original DOS game, using Ghidra for analysis and original x86 execution to validate behavior. The current project provides a reusable Rust library and an analysis CLI. It is **not a playable game yet**.
 
-The project cannot run the game yet. The Rust tools list files, inspect DOS MZ headers, decode the game's compressed resources, and reconstruct packed executables for four video modes.
+## Implemented
 
-The first reverse engineering milestone decoded all 79 compressed resources and reconstructed the MCGA executable for analysis in Ghidra. See [the findings and reproduction steps](docs/reverse-engineering.md).
+- Resource decompression validated against all 79 compressed files; directory readers for 13 plain and 71 decoded resource archives.
+- Readers for all 41 tracks, the default replay, and parameters for all eleven cars.
+- Reconstruction of the original DOS executables for MCGA, CGA, Tandy and EGA.
+- Complete speed and grip kernels, gearbox/torque/RPM handling, steering, exact trigonometry, matrices, rotations and random state.
+- A bounded preparation prefix of player physics; full world movement, suspension and collisions remain pending.
+- Native control traces checked against 6600 sequential frames of original DOS function execution.
+- **36 tests**, including original-code vectors, sequential state comparisons, format validation and failure rollback.
 
-The next milestone adds readers for the 41 original tracks and the default replay, maps key simulation functions in Ghidra, and ports the first fixed-point arithmetic routine with checks against executed DOS instructions. See [tracks, replays, and simulation](docs/track-replay-simulation.md).
+## Run
 
-The latest mapping adds resource directories, parameters for all eleven cars, and a steering-response port checked in 1488 original-code executions. Aero tables are checked against 22 original car-setup executions. See [steering and car parameters](docs/steering-car-parameters.md).
-
-Gearbox stages, torque selection, and the RPM helper are now ported with 2764 additional original-code comparisons. See [drivetrain mapping](docs/drivetrain.md). The full speed update is still pending, and `reverse/` remains local and excluded from Git.
-
-## Running
-
-Install the Rust toolchain. The original game files are in the `stunts_dos/` folder at the repository root.
+With Rust installed, from the repository root:
 
 ```powershell
-cd stunts-rs
-cargo run -- inventory ..\stunts_dos
-cargo run -- inspect ..\stunts_dos\LOAD.EXE
-cargo run -- inspect ..\stunts_dos\MCGA.HDR
-cargo run -- track ..\stunts_dos\HELL5.TRK
-cargo run -- replay ..\stunts_dos\DEFAULT.RPL
-cargo run -- car ..\stunts_dos\CARPMIN.RES
-cargo run -- steer -100 0 1 20
-cargo run -- gear-tick ..\stunts_dos\CARPMIN.RES 1 9000 16 20
-cargo test
+cargo test --manifest-path stunts-rs/Cargo.toml
+cargo run --manifest-path stunts-rs/Cargo.toml -- car stunts_dos/CARPMIN.RES
+cargo run --manifest-path stunts-rs/Cargo.toml -- replay stunts_dos/DEFAULT.RPL
+cargo run --manifest-path stunts-rs/Cargo.toml -- track stunts_dos/HELL5.TRK
 ```
+
+To export a native control-kernel trace on Windows:
+
+```powershell
+New-Item -ItemType Directory -Force reverse/decoded
+cargo build --release --manifest-path stunts-rs/Cargo.toml
+.\stunts-rs\target\release\stunts-rs.exe control-trace stunts_dos/CARPMIN.RES 20 150 reverse/decoded/INDY-control-native.csv
+```
+
+The output file must not already exist. This runs control calculations without position integration, suspension, collisions or graphics. Values are raw game quantities, not real-world telemetry. The library has no third-party runtime dependencies; optional Python/Unicorn tools regenerate the development fixtures.
 
 ## Layout
 
-- `stunts-rs/`: Rust source for the analysis tools and future reimplementation.
-- `stunts_dos/`: original game files, included in Git for analysis.
-- `reverse/`: local Ghidra project and analysis records, excluded from Git.
-- `docs/`: reverse engineering findings and exported text inventories.
-- `tools/ghidra/`: scripts for verified function names, simulation calls, and analysis exports.
+- `stunts-rs/`: reusable Rust library, command-line tool and validation fixtures.
+- `stunts_dos/`: original game files, included for analysis and tests.
+- `docs/`: findings, formats and exported text inventories.
+- `tools/`: Ghidra scripts and optional original-CPU comparison tools.
+- `reverse/`: local Ghidra database, reconstructed binaries, caches and reference tools; **excluded from Git**.
 
-## Planned steps
+## Analysis notes
 
-1. Identify the game version and study module loading and decompression.
-2. Reconstruct a static image for analysis in Ghidra.
-3. Implement resource readers using confirmed formats.
-4. Port math and physics while preserving DOS integer behavior.
-5. Compare per-frame states using replays before integrating graphics, input, and audio.
+- [Executable reconstruction and compression](docs/reverse-engineering.md)
+- [Tracks, replays and simulation entry points](docs/track-replay-simulation.md)
+- [Steering tables and car parameters](docs/steering-car-parameters.md)
+- [Gearbox, torque and RPM stages](docs/drivetrain.md)
+- [Complete speed/grip kernels and numerical foundations](docs/speed-grip-numerics.md)
+
+Next major work: the remaining `update_player_state` physics, terrain/contact planes, full replay world-state comparison, opponents, rendering, audio and device input.
 
 ## References
 

@@ -5,6 +5,9 @@ It also reads tracks and replays and includes the first verified fixed-point rou
 Resource archives, car parameters, steering updates, and aero tables are now supported.
 The verified drivetrain stages include gearbox motion, torque selection, and RPM.
 It cannot run the game yet.
+The library now ports complete speed/grip kernels, exact trig, matrices, rotations,
+and random state. The control-trace CLI exports native calculations to CSV.
+See ../docs/speed-grip-numerics.md for validation scope and remaining world physics.
 It does not modify the original files and has no external dependencies.
 
 From the stunts-rs folder:

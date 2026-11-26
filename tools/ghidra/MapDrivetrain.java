@@ -9,7 +9,7 @@ public class MapDrivetrain extends GhidraScript {
     public void run() throws Exception {
         if (!"2e2b514d183835267bdfd4ebeeb409b1c9facad78751ebaafeac54d93453e51b".equalsIgnoreCase(currentProgram.getExecutableSHA256()))
             throw new IllegalArgumentException("Unsupported executable SHA256");
-        label("1471:359c", "speed_integration_stage", "Boundary after the gearbox prefix. Rust gearbox_tick stops before this instruction; the rest of update_car_speed remains unported.");
+        label("1471:359c", "speed_integration_stage", "Boundary after the isolated gearbox prefix. Rust speed_tick now covers the complete update_car_speed function; see docs/speed-grip-numerics.md.");
         label("1471:36d6", "grounded_torque_selection", "Verified block entry: expects BX=carState and the function's BP stack frame. Torque port runs only until 1471:3724; see docs/drivetrain.md.");
         label("1471:3724", "torque_ratio_mass_scaling", "Boundary after torque selection. Original MUL uses the low 16-bit product before SHR; the following division is an unsigned-long helper. Do not assume a signed C expression is equivalent.");
         StructureDataType state = new StructureDataType(new CategoryPath("/Stunts"), "CarRuntimeState", 0xd0);

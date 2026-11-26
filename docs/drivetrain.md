@@ -12,7 +12,7 @@ Three bounded stages are now ported:
 | Grounded torque selection | `1471:36D6` to just before `1471:3724` | `Car::selected_torque` | 1540 original-code cases |
 | Complete RPM helper | `19DC:0006` | `drivetrain::rpm_from_speed` | 520 original-code cases |
 
-The gearbox and torque regions are internal parts of `update_car_speed`, not separate DOS functions. The helper for RPM is a complete function. These ports do not yet implement the complete speed update or a drivable car.
+The gearbox and torque regions are internal parts of `update_car_speed`, not separate DOS functions. The helper for RPM is a complete function. The next milestone now implements the [complete speed/grip kernels](speed-grip-numerics.md); a drivable car remains pending.
 
 The executable is loaded at segment `1000`, so the corresponding linear CPU boundaries are `17A78`, `17CAC`, `17DE6`, `17E34`, and `19DC6`. `MapDrivetrain.java` marks the internal stages without splitting them into invented functions and defines a partial packed `/Stunts/CarRuntimeState` type. `TraceSimulation.java` checks the RPM helper's complete 34-byte body and sets its five unsigned-word parameters and unsigned-word result in Ghidra.
 
@@ -101,8 +101,8 @@ To reproduce the Ghidra annotations and exports:
 analyzeHeadless reverse/projects Stunts -process MCGA.exe -noanalysis -scriptPath tools/ghidra -postScript MapDrivetrain.java -postScript TraceSimulation.java reverse/exports/simulation -postScript ExportAnalysis.java reverse/exports
 ```
 
-The suite now has 25 passing tests. `reverse/` remains excluded from Git.
+This earlier milestone had 25 passing tests; the current suite is documented in speed-grip-numerics.md. `reverse/` remains excluded from Git.
 
-## Remaining speed-update mapping
+## Follow-up speed-update work
 
-The next section applies aerodynamic drag, gravity, torque/ratio/mass scaling, braking, airborne behavior, wheel-speed reconciliation, and opponent adjustments before calling the RPM helper. Some details differ from a straightforward C rewrite: torque multiplication uses the low 16-bit result before shifting, and mass scaling calls an unsigned-long division helper. These are mapped observations, not yet a validated Rust implementation of speed integration. Grip, suspension, collisions, and full replay state comparison also remain pending.
+The next section applies aerodynamic drag, gravity, torque/ratio/mass scaling, braking, airborne behavior, wheel-speed reconciliation, and opponent adjustments before calling the RPM helper. Some details differ from a straightforward C rewrite: torque multiplication uses the low 16-bit result before shifting, and mass scaling calls an unsigned-long division helper. These observations are now covered by the validated complete port in [speed/grip kernels](speed-grip-numerics.md). Complete grip is now ported as well; suspension, collisions and full replay world-state comparison remain pending.

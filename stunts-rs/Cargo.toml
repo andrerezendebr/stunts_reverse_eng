@@ -2,6 +2,6 @@
 name = "stunts-rs"
 version = "0.1.0"
 edition = "2021"
-description = "Analysis tools for the Stunts reimplementation in Rust"
+description = "DOS resource analysis and verified simulation kernels for Stunts"
 
 [dependencies]
