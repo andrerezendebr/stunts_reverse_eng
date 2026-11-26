@@ -45,7 +45,7 @@ address	name	body_bytes
 1471:531c	FUN_1471_531c	370
 1471:5490	FUN_1471_5490	257
 1471:5592	setup_aero_trackdata	291
-19dc:0006	FUN_19dc_0006	34
+19dc:0006	update_rpm_from_speed	34
 19dc:0028	FUN_19dc_0028	23
 19dc:003f	FUN_19dc_003f	10
 19dc:0049	FUN_19dc_0049	10

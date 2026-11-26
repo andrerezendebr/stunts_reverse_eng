@@ -10,6 +10,8 @@ The next milestone adds readers for the 41 original tracks and the default repla
 
 The latest mapping adds resource directories, parameters for all eleven cars, and a steering-response port checked in 1488 original-code executions. Aero tables are checked against 22 original car-setup executions. See [steering and car parameters](docs/steering-car-parameters.md).
 
+Gearbox stages, torque selection, and the RPM helper are now ported with 2764 additional original-code comparisons. See [drivetrain mapping](docs/drivetrain.md). The full speed update is still pending, and `reverse/` remains local and excluded from Git.
+
 ## Running
 
 Install the Rust toolchain. The original game files are in the `stunts_dos/` folder at the repository root.
@@ -23,6 +25,7 @@ cargo run -- track ..\stunts_dos\HELL5.TRK
 cargo run -- replay ..\stunts_dos\DEFAULT.RPL
 cargo run -- car ..\stunts_dos\CARPMIN.RES
 cargo run -- steer -100 0 1 20
+cargo run -- gear-tick ..\stunts_dos\CARPMIN.RES 1 9000 16 20
 cargo test
 ```
 

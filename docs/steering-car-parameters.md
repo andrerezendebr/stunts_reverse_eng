@@ -142,4 +142,4 @@ There are now 21 passing Rust tests. No Python or Unicorn dependency is needed t
 
 ## Next mapping targets
 
-Trace torque lookup, gear changes, engine braking, and the conversion from speed and steering to wheel forces. Grip and suspension processing still need to be ported. These new routines do not yet form a runnable car simulation or reproduce an entire replay.
+Torque lookup, gearbox stages, and the RPM helper are now covered by [drivetrain mapping](drivetrain.md). Full speed integration, engine braking behavior, and conversion from speed and steering to wheel forces still need validation and porting. These routines do not yet form a runnable car simulation or reproduce an entire replay.

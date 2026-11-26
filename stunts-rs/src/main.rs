@@ -4,6 +4,7 @@
 use std::{env, error::Error, fs, io::Write, path::Path, process};
 mod car;
 mod compression;
+mod drivetrain;
 mod executable;
 mod fixed;
 mod replay;
@@ -93,6 +94,36 @@ fn run() -> Result<(), Box<dyn Error>> {
             }
         }
         Some("inspect") if args.len() == 2 => inspect(Path::new(&args[1]))?,
+        Some("rpm") if args.len() == 6 => {
+            let values = args[1..].iter().map(|s| s.to_str().ok_or("Invalid integer")?.parse::<u16>().map_err(|_| "Invalid u16 integer")).collect::<Result<Vec<_>,_>>()?;
+            println!("{}", drivetrain::rpm_from_speed(values[0], values[1], values[2], values[3], values[4]));
+        }
+        Some("torque") if args.len() == 5 => {
+            let bytes = fs::read(&args[1])?;
+            let car = car::Car::parse(&bytes)?;
+            println!("{}", car.selected_torque(args[2].to_str().ok_or("Invalid gear")?.parse()?, args[3].to_str().ok_or("Invalid RPM")?.parse()?, args[4].to_str().ok_or("Invalid limiter")?.parse()?)?);
+        }
+        Some("gear-tick") if args.len() == 6 => {
+            let bytes = fs::read(&args[1])?;
+            let car = car::Car::parse(&bytes)?;
+            let gear = args[2].to_str().ok_or("Invalid gear")?.parse()?;
+            let rpm = args[3].to_str().ok_or("Invalid RPM")?.parse()?;
+            let input = args[4].to_str().ok_or("Invalid input")?.parse()?;
+            let fps = args[5].to_str().ok_or("Invalid FPS")?.parse()?;
+            let (x,y) = car.knob_point(gear)?;
+            let mut state = drivetrain::State([0; drivetrain::STATE_SIZE]);
+            state.0[drivetrain::GEAR] = gear;
+            state.0[drivetrain::REAR_CONTACT] = 1;
+            state.set_word(drivetrain::RPM, rpm);
+            for offset in [drivetrain::KNOB_X, drivetrain::TARGET_X] { state.set_word(offset,x as u16); }
+            for offset in [drivetrain::KNOB_Y, drivetrain::TARGET_Y] { state.set_word(offset,y as u16); }
+            let ratio = car.gear_ratios()[usize::from(gear)];
+            state.set_word(drivetrain::GEAR_RATIO, ratio);
+            state.set_word(drivetrain::RATIO_HIGH, ratio >> 8);
+            drivetrain::gearbox_tick(&mut state, &car, input, fps)?;
+            println!("Gear={}, changing={}, shift timer={}, lever=({},{}), ratio={}", state.0[drivetrain::GEAR], state.0[drivetrain::CHANGING], state.0[drivetrain::SHIFT_TIMER], state.word(drivetrain::KNOB_X) as i16, state.word(drivetrain::KNOB_Y) as i16, state.word(drivetrain::GEAR_RATIO));
+            println!("Gearbox prefix only; speed integration was not executed.");
+        }
         Some("resources") if args.len() == 2 => {
             let bytes = fs::read(&args[1])?;
             let archive = resource::Archive::parse(&bytes)?;
@@ -180,7 +211,7 @@ fn run() -> Result<(), Box<dyn Error>> {
                 .write_all(&output)?;
             println!("Combined {mode} packed executable: {} bytes (EXEPACK unpacking still required)", output.len());
         }
-        _ => return Err("Usage: stunts-rs inventory <directory> | inspect <file> | resources <uncompressed-archive> | car <car-res> | steer <angle-i16> <speed-u16> <input-code> <fps> | track <trk> | replay <rpl> | replay-inputs <rpl> <new-csv> | fixed-mul <i16> <i16> | decompress <input> <new-output> | combine <game-directory> <video-mode> <new-output>".into()),
+        _ => return Err("Usage: stunts-rs rpm <current> <speed> <ratio> <changing> <idle> | torque <car-res> <gear> <rpm> <limiter> | gear-tick <car-res> <gear> <rpm> <input> <fps> | inventory <directory> | inspect <file> | resources <uncompressed-archive> | car <car-res> | steer <angle-i16> <speed-u16> <input-code> <fps> | track <trk> | replay <rpl> | replay-inputs <rpl> <new-csv> | fixed-mul <i16> <i16> | decompress <input> <new-output> | combine <game-directory> <video-mode> <new-output>".into()),
     }
     Ok(())
 }

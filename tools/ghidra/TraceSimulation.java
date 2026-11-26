@@ -6,6 +6,7 @@ import ghidra.program.model.listing.CodeUnit;
 import ghidra.program.model.listing.Function;
 import ghidra.program.model.listing.ParameterImpl;
 import ghidra.program.model.data.ShortDataType;
+import ghidra.program.model.data.UnsignedShortDataType;
 import ghidra.program.model.symbol.SourceType;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -34,7 +35,8 @@ public class TraceSimulation extends GhidraScript {
             {"2ea2:1624", "multiply_and_scale", "558bec8b4606f76e08d1e0d1d2d1e0d1d2d1e083d2008bc25dcb"},
             {"1471:40a2", "update_steering", "558bec83ec0657568b3e968ea1a28eb10ad3e824fc8846fc988b"},
             {"1471:5592", "setup_aero_trackdata", "558bec83ec025756837e0a007403e98300"},
-            {"274b:15dc", "locate_shape_alt", "558becff760aff7608ff7606"}
+            {"274b:15dc", "locate_shape_alt", "558becff760aff7608ff7606"},
+            {"19dc:0006", "update_rpm_from_speed", "558bec558b4e068b4608837e0c007505f7660a8bca3b4e0e73038b4e0e8bc15d5dcb"}
         };
         // Guard both the file version and each instruction prefix before renaming.
         // Prefixes stop before relocated segment words, which Ghidra adjusts.
@@ -58,6 +60,15 @@ public class TraceSimulation extends GhidraScript {
             SourceType.USER_DEFINED,
             new ParameterImpl("a", ShortDataType.dataType, currentProgram),
             new ParameterImpl("b", ShortDataType.dataType, currentProgram));
+        Function rpm = getFunctionAt(toAddr("19dc:0006"));
+        rpm.setReturnType(UnsignedShortDataType.dataType, SourceType.USER_DEFINED);
+        rpm.replaceParameters(Function.FunctionUpdateType.DYNAMIC_STORAGE_ALL_PARAMS, true,
+            SourceType.USER_DEFINED,
+            new ParameterImpl("current_rpm", UnsignedShortDataType.dataType, currentProgram),
+            new ParameterImpl("speed", UnsignedShortDataType.dataType, currentProgram),
+            new ParameterImpl("gear_ratio", UnsignedShortDataType.dataType, currentProgram),
+            new ParameterImpl("changing_gear", UnsignedShortDataType.dataType, currentProgram),
+            new ParameterImpl("idle_rpm", UnsignedShortDataType.dataType, currentProgram));
         DecompInterface decompiler = new DecompInterface();
         try (PrintWriter calls = new PrintWriter(Files.newBufferedWriter(directory.resolve("simulation-calls.tsv"), StandardCharsets.UTF_8))){
             calls.println("caller_address\tcaller_name\tcallee_address\tcallee_name");

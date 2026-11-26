@@ -3,6 +3,7 @@ Stunts reimplementation in Rust — getting started
 This project provides resource decompression and executable reconstruction tools.
 It also reads tracks and replays and includes the first verified fixed-point routine.
 Resource archives, car parameters, steering updates, and aero tables are now supported.
+The verified drivetrain stages include gearbox motion, torque selection, and RPM.
 It cannot run the game yet.
 It does not modify the original files and has no external dependencies.
 
@@ -19,6 +20,7 @@ the decompress/combine commands, validation results, and Ghidra instructions.
 See ../docs/track-replay-simulation.md for track/replay layouts, simulation entry
 points, and validation of the first numerical port against original DOS code.
 See ../docs/steering-car-parameters.md for the latest data mapping and control ports.
+See ../docs/drivetrain.md for bounded gearbox/torque stages and the RPM helper.
 
 Roadmap:
 1. Identify the version and reconstruct the decompressed game image.

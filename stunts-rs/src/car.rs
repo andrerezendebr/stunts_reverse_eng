@@ -77,6 +77,33 @@ impl<'a> Car<'a> {
         })
     }
 
+    /// Raw shift-lever coordinates, including neutral at index zero.
+    pub fn knob_point(&self, gear: u8) -> Result<(i16, i16), String> {
+        if gear > self.gears() || gear > 6 {
+            return Err("Gear lies outside the car's table".into());
+        }
+        let offset = 0x1c + usize::from(gear) * 4;
+        Ok((self.signed_word(offset), self.signed_word(offset + 2)))
+    }
+
+    /// Torque selection block at DOS 17DE6..17E34, before ratio/mass scaling.
+    /// This does not apply the caller's overspeed, airborne, or shifting branches.
+    pub fn selected_torque(&self, gear: u8, rpm: u16, limiter_timer: u8) -> Result<u8, String> {
+        self.knob_point(gear)?;
+        let mut torque = if gear <= 1 && (rpm as i16) < 2600 {
+            self.idle_torque()
+        } else {
+            *self
+                .torque_curve()
+                .get(usize::from(rpm >> 7))
+                .ok_or("RPM lies outside the mapped torque curve")?
+        };
+        if limiter_timer != 0 && (rpm as i16) < 5000 {
+            torque = ((u16::from(self.idle_torque()) + u16::from(torque)) >> 1) as u8;
+        }
+        Ok(torque)
+    }
+
     /// setup_aero_trackdata builds 64 signed words: (aero * index²) >> 9.
     /// Explicit wrapping and narrowing match the DOS long multiply and word store.
     /// This table is a game quantity; physical units have not been established.

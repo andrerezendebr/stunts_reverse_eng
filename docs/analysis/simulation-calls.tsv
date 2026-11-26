@@ -21,7 +21,7 @@ caller_address	caller_name	callee_address	callee_name
 1471:2ad8	player_op	2ea2:3cbe	FUN_2ea2_3cbe
 1471:2ad8	player_op	2ea2:3d0c	FUN_2ea2_3d0c
 1471:2ad8	player_op	2ea2:3ece	FUN_2ea2_3ece
-1471:3368	update_car_speed	19dc:0006	FUN_19dc_0006
+1471:3368	update_car_speed	19dc:0006	update_rpm_from_speed
 1471:3368	update_car_speed	2cc5:1938	FUN_2cc5_1938
 1471:3368	update_car_speed	2cc5:1bec	FUN_2cc5_1bec
 1471:3368	update_car_speed	2cc5:1c88	FUN_2cc5_1c88
